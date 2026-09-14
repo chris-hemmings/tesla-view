@@ -1,0 +1,11 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tesla View",
+        "description": "Adds the 3D Tesla card to your dashboards. After setup, add a card of type `custom:tesla-view-card`."
+      }
+    },
+    "abort": { "single_instance_allowed": "Already configured. Only a single configuration possible." }
+  }
+}

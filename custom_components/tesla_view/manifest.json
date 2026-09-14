@@ -1,0 +1,12 @@
+{
+  "domain": "tesla_view",
+  "name": "Tesla View",
+  "codeowners": ["@koenhendriks"],
+  "config_flow": true,
+  "dependencies": ["http", "lovelace", "frontend"],
+  "documentation": "https://git.pixelfy.nl/koenhendriks/tesla-view",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "requirements": [],
+  "version": "0.1.0"
+}

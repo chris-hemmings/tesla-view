@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tesla-view-card – dev harness</title>
+<style>
+  body{margin:0;background:#111;color:#ddd;font:13px system-ui,sans-serif;display:grid;grid-template-columns:1fr 300px;height:100vh}
+  #cards{padding:16px;display:flex;flex-direction:column;gap:16px;overflow:auto}
+  #panel{padding:12px;background:#1a1d24;overflow:auto;border-left:1px solid #2a2f3a}
+  #panel h3{margin:8px 0 4px;font-size:12px;color:#8fa}
+  #panel button{display:block;width:100%;margin:2px 0;text-align:left;background:#242a36;color:#eee;border:1px solid #333a48;border-radius:4px;padding:4px 8px;cursor:pointer}
+  #panel button.on{background:#3a5bd9}
+  #log{white-space:pre-wrap;font:11px monospace;color:#bbb;max-height:40vh;overflow:auto}
+  tesla-view-card{display:block;max-width:900px}
+  ha-card{display:block;background:#1c1c1c;border-radius:12px;box-shadow:0 2px 8px #0008}
+</style>
+<script>window.TESLA_VIEW_ASSET_BASE = location.origin + '/assets/';</script>
+</head>
+<body>
+<div id="cards"></div>
+<div id="panel"><h3>mock entities</h3><div id="toggles"></div><h3>callService log</h3><div id="log"></div></div>
+<script type="module" src="./mock-hass.ts"></script>
+</body>
+</html>
