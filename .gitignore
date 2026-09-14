@@ -1,0 +1,9 @@
+# Original app bundle (480 MB, Tesla-copyrighted) – keep local only
+*.apks
+*.apk
+# Full recovered Godot project (451 MB, all vehicles + energy products) – derivable, too large for git.
+# Re-create with: gdre_tools --headless --recover=<assets/godot dir> (see extracted/README.md)
+extracted/full-godot-project-recovered/
+# local junk
+.DS_Store
+Thumbs.db
