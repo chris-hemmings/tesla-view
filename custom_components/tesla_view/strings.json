@@ -3,9 +3,106 @@
     "step": {
       "user": {
         "title": "Tesla View",
-        "description": "Adds the 3D Tesla card to your dashboards. After setup, add a card of type `custom:tesla-view-card`."
+        "description": "Tesla View renders your car in 3D from an **asset pack** you build yourself from a copy of the Tesla app with [tesla-view-extractor]({extractor_url}). You can upload the pack now or later via *Configure* ([how it works]({docs_url})).",
+        "data": {
+          "pack_file": "Asset pack (zip)"
+        },
+        "data_description": {
+          "pack_file": "Optional. The tesla-view-pack-….zip produced by the extractor, up to 100 MB."
+        }
       }
     },
-    "abort": { "single_instance_allowed": "Already configured. Only a single configuration possible." }
+    "error": {
+      "not_zip": "The file is not a zip archive.",
+      "no_manifest": "The zip has no manifest.json at its root – it is not a Tesla View asset pack.",
+      "bad_manifest": "manifest.json could not be read.",
+      "unsupported_format": "This pack uses a newer format than this version of Tesla View supports. Update the integration.",
+      "no_models": "The pack contains no vehicle models.",
+      "bad_model_id": "The pack contains an invalid model id.",
+      "unsafe_path": "The pack contains unsafe file paths and was rejected.",
+      "too_large": "The pack is too large to unpack.",
+      "missing_file": "The pack is incomplete: files referenced by its manifest are missing.",
+      "no_file": "Choose a zip file first.",
+      "unknown": "Unexpected error – see the Home Assistant log."
+    },
+    "abort": {
+      "single_instance_allowed": "Tesla View is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tesla View asset packs",
+        "description": "Installed packs: {packs}\n\nBuild a pack from your copy of the Tesla app with [tesla-view-extractor]({extractor_url}).",
+        "menu_options": {
+          "upload": "Upload / replace an asset pack",
+          "remove": "Remove an asset pack"
+        }
+      },
+      "upload": {
+        "title": "Upload asset pack",
+        "description": "A pack for models that are already installed replaces the old one. Dashboards pick the change up after a refresh.",
+        "data": {
+          "pack_file": "Asset pack (zip)"
+        },
+        "data_description": {
+          "pack_file": "tesla-view-pack-….zip from the extractor, up to 100 MB."
+        }
+      },
+      "remove": {
+        "title": "Remove asset pack",
+        "description": "The pack's files are deleted from the Home Assistant configuration folder.",
+        "data": {
+          "pack": "Pack"
+        }
+      }
+    },
+    "error": {
+      "not_zip": "The file is not a zip archive.",
+      "no_manifest": "The zip has no manifest.json at its root – it is not a Tesla View asset pack.",
+      "bad_manifest": "manifest.json could not be read.",
+      "unsupported_format": "This pack uses a newer format than this version of Tesla View supports. Update the integration.",
+      "no_models": "The pack contains no vehicle models.",
+      "bad_model_id": "The pack contains an invalid model id.",
+      "unsafe_path": "The pack contains unsafe file paths and was rejected.",
+      "too_large": "The pack is too large to unpack.",
+      "missing_file": "The pack is incomplete: files referenced by its manifest are missing.",
+      "no_file": "Choose a zip file first.",
+      "unknown": "Unexpected error – see the Home Assistant log."
+    },
+    "abort": {
+      "no_packs": "No asset pack is installed."
+    }
+  },
+  "issues": {
+    "no_asset_pack": {
+      "title": "Tesla View has no asset pack",
+      "fix_flow": {
+        "step": {
+          "upload": {
+            "title": "Upload a Tesla View asset pack",
+            "description": "The card cannot show your car until an asset pack is installed. Build one from your copy of the Tesla app with [tesla-view-extractor]({extractor_url}) and upload the zip here ([details]({docs_url})).",
+            "data": {
+              "pack_file": "Asset pack (zip)"
+            },
+            "data_description": {
+              "pack_file": "tesla-view-pack-….zip from the extractor, up to 100 MB."
+            }
+          }
+        },
+        "error": {
+          "not_zip": "The file is not a zip archive.",
+          "no_manifest": "The zip has no manifest.json at its root – it is not a Tesla View asset pack.",
+          "bad_manifest": "manifest.json could not be read.",
+          "unsupported_format": "This pack uses a newer format than this version of Tesla View supports. Update the integration.",
+          "no_models": "The pack contains no vehicle models.",
+          "bad_model_id": "The pack contains an invalid model id.",
+          "unsafe_path": "The pack contains unsafe file paths and was rejected.",
+          "too_large": "The pack is too large to unpack.",
+          "missing_file": "The pack is incomplete: files referenced by its manifest are missing.",
+          "unknown": "Unexpected error – see the Home Assistant log."
+        }
+      }
+    }
   }
 }

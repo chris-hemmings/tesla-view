@@ -3,10 +3,11 @@
   "name": "Tesla View",
   "codeowners": ["@koenhendriks"],
   "config_flow": true,
-  "dependencies": ["http", "lovelace", "frontend"],
-  "documentation": "https://git.pixelfy.nl/koenhendriks/tesla-view",
+  "dependencies": ["file_upload", "frontend", "http", "lovelace", "repairs"],
+  "documentation": "https://github.com/koenhendriks/tesla-view",
   "integration_type": "service",
   "iot_class": "calculated",
+  "issue_tracker": "https://github.com/koenhendriks/tesla-view/issues",
   "requirements": [],
-  "version": "0.1.2"
+  "version": "0.2.0"
 }
