@@ -1,0 +1,21 @@
+# Dev Home Assistant for the Tesla View card. See dev-hass/README.md.
+default_config:
+
+frontend:
+  themes: !include_dir_merge_named themes
+
+homeassistant:
+  packages: !include_dir_named packages     # packages/tesla_dummy.yaml = fake Model Y entities
+
+lovelace:
+  dashboards:
+    tesla-view:                             # http://localhost:8123/tesla-view
+      mode: yaml
+      title: Tesla View
+      icon: mdi:car-electric
+      show_in_sidebar: true
+      filename: dashboards/tesla-view.yaml
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml

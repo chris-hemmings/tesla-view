@@ -1,0 +1,69 @@
+# YAML-mode dev dashboard: the Tesla View card wired to the dummy entities, plus controls to flip their state.
+title: Tesla View
+views:
+  - title: Model Y
+    path: model-y
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:tesla-view-card
+            paint: Quicksilver
+            wheels: Crossflow19
+            aspect_ratio: "16:9"
+            entities:
+              frunk: cover.model_y_frunk
+              trunk: cover.model_y_trunk
+              charge_port: cover.model_y_charge_port_door
+              lock: lock.model_y_lock
+              door_fl: binary_sensor.model_y_front_driver_door
+              door_fr: binary_sensor.model_y_front_passenger_door
+              door_rl: binary_sensor.model_y_rear_driver_door
+              door_rr: binary_sensor.model_y_rear_passenger_door
+              window_fl: binary_sensor.model_y_front_driver_window
+              window_fr: binary_sensor.model_y_front_passenger_window
+              window_rl: binary_sensor.model_y_rear_driver_window
+              window_rr: binary_sensor.model_y_rear_passenger_window
+              charge_cable: binary_sensor.model_y_charge_cable
+              charging: sensor.model_y_charging
+              headlights: binary_sensor.model_y_headlights
+              drl: binary_sensor.model_y_daytime_running_lights
+              flash_lights: button.model_y_flash_lights
+      - type: grid
+        cards:
+          - type: heading
+            heading: Dummy vehicle state
+          - type: entities
+            entities:
+              - input_boolean.tesla_frunk
+              - input_boolean.tesla_trunk
+              - input_boolean.tesla_charge_port
+              - input_boolean.tesla_locked
+              - input_boolean.tesla_charge_cable
+              - input_select.tesla_charging_state
+              - input_boolean.tesla_headlights
+              - input_boolean.tesla_drl
+              - input_number.tesla_latency
+          - type: entities
+            title: Doors & windows
+            entities:
+              - input_boolean.tesla_door_fl
+              - input_boolean.tesla_door_fr
+              - input_boolean.tesla_door_rl
+              - input_boolean.tesla_door_rr
+              - input_boolean.tesla_window_fl
+              - input_boolean.tesla_window_fr
+              - input_boolean.tesla_window_rl
+              - input_boolean.tesla_window_rr
+          - type: entities
+            title: What the card sees
+            entities:
+              - cover.model_y_frunk
+              - cover.model_y_trunk
+              - cover.model_y_charge_port_door
+              - lock.model_y_lock
+              - binary_sensor.model_y_charge_cable
+              - sensor.model_y_charging
+              - button.model_y_flash_lights

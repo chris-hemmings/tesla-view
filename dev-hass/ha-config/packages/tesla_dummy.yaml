@@ -1,0 +1,127 @@
+# Dummy Model Y: the same entity shapes the core Tesla Fleet integration creates, backed by input_* helpers so state can
+# be flipped from the UI (or via the API) while developing the card. Commands from the card (cover.open_cover,
+# lock.unlock, button.press) change the helpers after a short "vehicle latency", so the card's optimistic state and the
+# confirmation path are exercised.
+
+input_boolean:
+  tesla_frunk:        { name: "Dummy: frunk open",           icon: mdi:car-lifted-pickup }
+  tesla_trunk:        { name: "Dummy: trunk open",           icon: mdi:car-back }
+  tesla_charge_port:  { name: "Dummy: charge port open",     icon: mdi:ev-plug-ccs2 }
+  tesla_locked:       { name: "Dummy: locked",               icon: mdi:lock, initial: true }
+  tesla_door_fl:      { name: "Dummy: front driver door",    icon: mdi:car-door }
+  tesla_door_fr:      { name: "Dummy: front passenger door", icon: mdi:car-door }
+  tesla_door_rl:      { name: "Dummy: rear driver door",     icon: mdi:car-door }
+  tesla_door_rr:      { name: "Dummy: rear passenger door",  icon: mdi:car-door }
+  tesla_window_fl:    { name: "Dummy: front driver window",    icon: mdi:window-open-variant }
+  tesla_window_fr:    { name: "Dummy: front passenger window", icon: mdi:window-open-variant }
+  tesla_window_rl:    { name: "Dummy: rear driver window",     icon: mdi:window-open-variant }
+  tesla_window_rr:    { name: "Dummy: rear passenger window",  icon: mdi:window-open-variant }
+  tesla_charge_cable: { name: "Dummy: charge cable plugged", icon: mdi:power-plug }
+  tesla_headlights:   { name: "Dummy: headlights",           icon: mdi:car-light-high }
+  tesla_drl:          { name: "Dummy: daytime running lights", icon: mdi:car-light-dimmed }
+
+input_select:
+  tesla_charging_state:
+    name: "Dummy: charging state"
+    icon: mdi:battery-charging
+    # values of the Tesla Fleet `charge_state_charging_state` enum sensor
+    options: [disconnected, no_power, starting, charging, complete, stopped]
+    initial: disconnected
+
+input_number:
+  tesla_latency:
+    name: "Dummy: command latency (s)"
+    icon: mdi:timer-sand
+    min: 0
+    max: 30
+    step: 0.5
+    initial: 2
+    unit_of_measurement: s
+
+template:
+  - cover:
+      - name: Model Y frunk
+        unique_id: dummy_model_y_frunk
+        device_class: door
+        state: "{{ 'open' if is_state('input_boolean.tesla_frunk', 'on') else 'closed' }}"
+        open_cover:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_on
+            target: { entity_id: input_boolean.tesla_frunk }
+        close_cover:                          # the real frunk can't be closed remotely; here for convenience
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.tesla_frunk }
+      - name: Model Y trunk
+        unique_id: dummy_model_y_trunk
+        device_class: door
+        state: "{{ 'open' if is_state('input_boolean.tesla_trunk', 'on') else 'closed' }}"
+        open_cover:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_on
+            target: { entity_id: input_boolean.tesla_trunk }
+        close_cover:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.tesla_trunk }
+      - name: Model Y charge port door
+        unique_id: dummy_model_y_charge_port_door
+        device_class: door
+        state: "{{ 'open' if is_state('input_boolean.tesla_charge_port', 'on') else 'closed' }}"
+        open_cover:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_on
+            target: { entity_id: input_boolean.tesla_charge_port }
+        close_cover:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.tesla_charge_port }
+
+  - lock:
+      - name: Model Y lock
+        unique_id: dummy_model_y_lock
+        state: "{{ is_state('input_boolean.tesla_locked', 'on') }}"
+        lock:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_on
+            target: { entity_id: input_boolean.tesla_locked }
+        unlock:
+          - delay: { seconds: "{{ states('input_number.tesla_latency') | float(0) }}" }
+          - action: input_boolean.turn_off
+            target: { entity_id: input_boolean.tesla_locked }
+
+  - binary_sensor:
+      - { name: Model Y front driver door,      unique_id: dummy_model_y_door_fl,   device_class: door,   state: "{{ is_state('input_boolean.tesla_door_fl', 'on') }}" }
+      - { name: Model Y front passenger door,   unique_id: dummy_model_y_door_fr,   device_class: door,   state: "{{ is_state('input_boolean.tesla_door_fr', 'on') }}" }
+      - { name: Model Y rear driver door,       unique_id: dummy_model_y_door_rl,   device_class: door,   state: "{{ is_state('input_boolean.tesla_door_rl', 'on') }}" }
+      - { name: Model Y rear passenger door,    unique_id: dummy_model_y_door_rr,   device_class: door,   state: "{{ is_state('input_boolean.tesla_door_rr', 'on') }}" }
+      - { name: Model Y front driver window,    unique_id: dummy_model_y_window_fl, device_class: window, state: "{{ is_state('input_boolean.tesla_window_fl', 'on') }}" }
+      - { name: Model Y front passenger window, unique_id: dummy_model_y_window_fr, device_class: window, state: "{{ is_state('input_boolean.tesla_window_fr', 'on') }}" }
+      - { name: Model Y rear driver window,     unique_id: dummy_model_y_window_rl, device_class: window, state: "{{ is_state('input_boolean.tesla_window_rl', 'on') }}" }
+      - { name: Model Y rear passenger window,  unique_id: dummy_model_y_window_rr, device_class: window, state: "{{ is_state('input_boolean.tesla_window_rr', 'on') }}" }
+      - { name: Model Y charge cable,           unique_id: dummy_model_y_charge_cable, device_class: plug, state: "{{ is_state('input_boolean.tesla_charge_cable', 'on') }}" }
+      - { name: Model Y headlights,             unique_id: dummy_model_y_headlights, device_class: light, state: "{{ is_state('input_boolean.tesla_headlights', 'on') }}" }
+      - { name: Model Y daytime running lights, unique_id: dummy_model_y_drl,        device_class: light, state: "{{ is_state('input_boolean.tesla_drl', 'on') }}" }
+
+  - sensor:
+      - name: Model Y charging
+        unique_id: dummy_model_y_charging
+        icon: mdi:battery-charging
+        device_class: enum
+        state: "{{ states('input_select.tesla_charging_state') }}"
+        attributes:
+          options: "{{ ['disconnected', 'no_power', 'starting', 'charging', 'complete', 'stopped'] }}"
+
+  - button:
+      - name: Model Y flash lights
+        unique_id: dummy_model_y_flash_lights
+        icon: mdi:car-light-alert
+        press:                                  # visible feedback: headlights blink twice
+          - repeat:
+              count: 2
+              sequence:
+                - action: input_boolean.turn_on
+                  target: { entity_id: input_boolean.tesla_headlights }
+                - delay: { milliseconds: 400 }
+                - action: input_boolean.turn_off
+                  target: { entity_id: input_boolean.tesla_headlights }
+                - delay: { milliseconds: 400 }

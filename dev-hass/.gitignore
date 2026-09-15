@@ -1,0 +1,5 @@
+# Home Assistant runtime state – only configuration.yaml, packages/ and dashboards/ are meant to be versioned
+ha-config/*
+!ha-config/configuration.yaml
+!ha-config/packages/
+!ha-config/dashboards/
