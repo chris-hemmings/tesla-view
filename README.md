@@ -75,6 +75,7 @@ optimistically for up to 60 s until the entity confirms; failures (e.g. missing 
 | `custom_components/tesla_view/` | the HA integration; `frontend/` holds the built `tesla-view-card.js` and `assets/` |
 | `card/` | card source (TypeScript, Lit, three.js, Vite). `npm run dev` opens a harness with a mock `hass`; `npm run build` rebuilds the bundle + assets into the integration |
 | `tools/build-assets.py` | copies only the referenced assets from `extracted/` into the integration |
+| `tools/smoke-server.py` | serves the built bundle under the same `/tesla_view/…` paths Home Assistant uses, for testing without HA |
 | `extracted/` | everything recovered from the Tesla app (models, textures, materials, decompiled scripts, converters, standalone `viewer.html`) – see `extracted/README.md` |
 
 ## How the 3D side works
