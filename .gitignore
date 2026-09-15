@@ -1,14 +1,19 @@
-# Original app bundle (480 MB, Tesla-copyrighted) – keep local only
+# Tesla app material – never in this repo. Extract packs with tesla-view-extractor; keep bundles/recovered projects elsewhere.
 *.apks
 *.apk
-# Full recovered Godot project (451 MB, all vehicles + energy products) – derivable, too large for git.
-# Re-create with: gdre_tools --headless --recover=<assets/godot dir> (see extracted/README.md)
-extracted/full-godot-project-recovered/
-# local junk
-.DS_Store
-Thumbs.db
-# card build tooling
+*.xapk
+extracted/
+tesla-view-pack*.zip
+tesla_view.zip
+# build output (CI builds it; HACS installs the release zip)
+custom_components/tesla_view/frontend/tesla-view-card.js
+custom_components/tesla_view/frontend/assets/
+custom_components/hacs/
+# dev
 card/node_modules/
 card/dev/public/
+dev-hass/ha-config-hacs/
 __pycache__/
 *.pyc
+.DS_Store
+Thumbs.db
