@@ -1,4 +1,4 @@
-# Tesla View – interactive 3D Tesla card for Home Assistant
+# Tesla View – Realtime interactive 3D Tesla card for Home Assistant
 
 A Home Assistant custom integration + Lovelace card that shows your Tesla as an interactive 3D model rendered the way
 the Tesla app renders it – same meshes, materials, animations and lighting – driven by your Home Assistant entities:
@@ -6,11 +6,29 @@ doors, windows, frunk, trunk, charge port, charge cable with charging flow, lock
 real actions (open frunk/trunk, open/close charge port, lock/unlock, flash lights) through the Tesla Fleet integration
 or any other entity you map (BLE, MQTT, …).
 
-![card](docs/screenshot.jpg)
+![demo](./demo/demo.gif)
 
 The 3D assets are **not** included: they belong to Tesla and live inside the Tesla mobile app. You build an *asset
 pack* from your own copy of the app with [tesla-view-extractor](https://github.com/koenhendriks/tesla-view-extractor)
 and upload it once in Home Assistant. See [Asset pack](#asset-pack).
+
+## Automatic mapping of entities
+
+If you have the Tesla Fleet API enabled you can select this device to automatically sync all entity states to the 3D 
+view. If you have your own entities (for instance from a BLE Proxy or a different API setup) you can map them to each
+item in the 3D view as well.
+
+## Visual Editor
+
+This integration supports complete visual editor, there is no need to ever configure yaml files (but you can if you
+really want to). The Tesla View supports anymodel the Tesla app support with complete support of configuration such as: 
+
+- Color
+- Wheels
+- Charger Type
+- License Plate type 
+
+![setup](./demo/setup.gif)
 
 ## Install
 
