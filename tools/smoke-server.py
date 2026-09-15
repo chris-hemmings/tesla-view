@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Serve the *built* Tesla View bundle the way Home Assistant does, for a smoke test without HA.
 
-  /tesla_view/…   → custom_components/tesla_view/frontend/   (bundle + assets, same URLs as in HA)
-  /               → a test page that loads the bundle with a fake `hass` (trunk + charge port open, cable charging)
+  /tesla_view/…          → custom_components/tesla_view/frontend/   (the bundle, same URL as in HA)
+  /tesla_view_assets/…   → card/dev/public/tesla_view/            (asset packs installed with tools/dev-assets.py)
+  /                      → a test page that loads the bundle with a fake `hass` (trunk + charge port open, cable charging)
 
 Usage:  python3 tools/smoke-server.py [port]       (default 8766)   → open http://127.0.0.1:<port>/
 The page exposes `window.card` and `window.setState(entity_id, state)` for scripted checks.
@@ -11,6 +12,7 @@ import http.server, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND = os.path.join(ROOT, "custom_components", "tesla_view", "frontend")
+ASSETS = os.path.join(ROOT, "card", "dev", "public", "tesla_view")   # filled by tools/dev-assets.py
 VERSION = re.search(r'VERSION\s*=\s*"([^"]+)"', open(os.path.join(ROOT, "custom_components/tesla_view/const.py")).read()).group(1)
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8766
 
@@ -19,7 +21,7 @@ PAGE = f"""<!doctype html><meta charset="utf-8"><title>tesla-view-card – built
 <tesla-view-card></tesla-view-card>
 <p style="margin:16px">bundle: <code>/tesla_view/tesla-view-card.js?v={VERSION}</code> — use <code>setState('cover.y_trunk','closed')</code> in the console.</p>
 <script type="module">
-  import '/tesla_view/tesla-view-card.js?v={VERSION}';
+  import '/tesla_view/tesla-view-card.js?v={VERSION}&assets=/tesla_view_assets/&p=dev';
   const now = () => new Date().toISOString();
   const states = {{}};
   const st = (id, state) => states[id] = {{ entity_id: id, state, attributes: {{}}, last_changed: now(), last_updated: now() }};
@@ -41,6 +43,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def translate_path(self, path):
         path = path.split("?", 1)[0]
+        if path.startswith("/tesla_view_assets/"):
+            return os.path.join(ASSETS, *path[len("/tesla_view_assets/"):].split("/"))
         if path.startswith("/tesla_view/"):
             return super().translate_path(path[len("/tesla_view"):])
         return None
@@ -62,5 +66,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if not os.path.exists(os.path.join(FRONTEND, "tesla-view-card.js")):
     sys.exit("no built bundle – run `npm run build` in card/ first")
-print(f"serving {FRONTEND} at http://127.0.0.1:{PORT}/tesla_view/  –  test page: http://127.0.0.1:{PORT}/")
+if not os.path.exists(os.path.join(ASSETS, "index.json")):
+    print("warning: no asset pack in card/dev/public – run `npm run dev:assets -- pack.zip` (the card will show the no-pack notice)")
+print(f"serving {FRONTEND} at http://127.0.0.1:{PORT}/tesla_view/ and packs at /tesla_view_assets/  –  test page: http://127.0.0.1:{PORT}/")
 http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

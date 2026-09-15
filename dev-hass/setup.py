@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-shot setup of the dev Home Assistant for Tesla View (stdlib only, idempotent).
 
-  docker compose up -d && python3 setup.py
+  docker compose up -d && python3 setup.py [--pack tesla-view-pack-….zip]
 
 1. waits for HA, 2. completes onboarding (creates the owner `dev` / `dev`), 3. adds the Tesla View config entry
 (which serves /tesla_view/ and registers the Lovelace resource), 4. creates the storage-mode dashboard `dev-cards` with a
@@ -10,7 +10,8 @@ Prints a short-lived access token you can use with curl / the REST API.
 """
 import base64, json, os, socket, struct, sys, time, urllib.error, urllib.parse, urllib.request
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8123"
+_positional = [a for a in sys.argv[1:] if a.startswith("http")]
+BASE = _positional[0] if _positional else "http://localhost:8123"
 USER, PASSWORD, NAME = "dev", "dev", "Dev"
 CLIENT_ID = BASE + "/"
 
@@ -182,6 +183,36 @@ def add_dev_dashboard(token):
     ws.sock.close()
 
 
+def upload_file(token, path):
+    """POST /api/file_upload (multipart) → file_id, the handle config flows accept in a FileSelector."""
+    boundary = "----tesla-view-" + os.urandom(8).hex()
+    name = os.path.basename(path)
+    body = (
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\n"
+        "Content-Type: application/zip\r\n\r\n"
+    ).encode() + open(path, "rb").read() + f"\r\n--{boundary}--\r\n".encode()
+    r = urllib.request.Request(BASE + "/api/file_upload", data=body, method="POST",
+                               headers={"Authorization": f"Bearer {token}", "Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(r, timeout=300) as resp:
+        return json.loads(resp.read())["file_id"]
+
+
+def install_pack(token, path):
+    """Upload a pack zip and feed it to the integration's options flow (Configure → Upload)."""
+    status, entries = req("/api/config/config_entries/entry?domain=tesla_view", token=token)
+    assert status == 200 and entries, "tesla_view config entry missing"
+    entry_id = entries[0]["entry_id"]
+    file_id = upload_file(token, path)
+    status, flow = req("/api/config/config_entries/options/flow", {"handler": entry_id}, token)
+    assert status == 200 and flow.get("type") == "menu", flow
+    status, flow = req(f"/api/config/config_entries/options/flow/{flow['flow_id']}", {"next_step_id": "upload"}, token)
+    assert status == 200 and flow.get("type") == "form", flow
+    status, res = req(f"/api/config/config_entries/options/flow/{flow['flow_id']}", {"pack_file": file_id}, token)
+    if status != 200 or res.get("type") != "create_entry":
+        sys.exit(f"pack upload rejected: {res}")
+    print(f"pack: installed {os.path.basename(path)}")
+
+
 def check(token):
     status, states = req("/api/states", token=token)
     ids = {s["entity_id"] for s in states}
@@ -192,16 +223,27 @@ def check(token):
     print("dummy entities:", "all present" if not missing else f"MISSING {missing}")
     status, raw = req("/tesla_view/tesla-view-card.js")
     print(f"card bundle /tesla_view/tesla-view-card.js: HTTP {status}, {len(raw) / 1e3:.0f} kB")
-    status, _ = req("/tesla_view/assets/paint-colors.json")
-    print(f"card assets /tesla_view/assets/…: HTTP {status}")
-    return not missing and status == 200
+    status, idx = req("/tesla_view_assets/index.json")
+    models = list((idx or {}).get("models", {})) if status == 200 and isinstance(idx, dict) else []
+    print(f"asset packs /tesla_view_assets/index.json: HTTP {status}, models {models or 'none'}")
+    ws = WS(token)
+    issues = ws.call({"type": "repairs/list_issues"}).get("issues", [])
+    ws.sock.close()
+    no_pack = any(i.get("domain") == "tesla_view" and i.get("issue_id") == "no_asset_pack" for i in issues)
+    print("repairs: " + ("'no asset pack' issue OPEN" if no_pack else "no open Tesla View issues"))
+    return not missing and status == 200 and bool(models) == (not no_pack)
 
 
 if __name__ == "__main__":
+    pack = None
+    if "--pack" in sys.argv:
+        pack = sys.argv[sys.argv.index("--pack") + 1]
     wait_for_ha()
     tok = onboard()
     add_tesla_view(tok)
     add_dev_dashboard(tok)
+    if pack:
+        install_pack(tok, pack)
     ok = check(tok)
     print(f"\ndashboards: {BASE}/tesla-view (YAML, dummy controls)   {BASE}/dev-cards (storage, visual editor)   login: {USER} / {PASSWORD}")
     print(f"access token (≈30 min): {tok}")

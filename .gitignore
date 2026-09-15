@@ -9,5 +9,6 @@ extracted/full-godot-project-recovered/
 Thumbs.db
 # card build tooling
 card/node_modules/
+card/dev/public/
 __pycache__/
 *.pyc

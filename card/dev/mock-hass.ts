@@ -70,11 +70,14 @@ function renderToggles() {
   theme.onclick = () => { hass.themes.darkMode = !hass.themes.darkMode; document.body.style.background = hass.themes.darkMode ? '#111' : '#eee'; publish(); }; t.appendChild(theme);
 }
 
-const configs = [
-  { type: 'custom:tesla-view-card', device_id: DEVICE, paint: 'Quicksilver', entities: { headlights: 'binary_sensor.ble_headlights' } },
-];
 const params = new URLSearchParams(location.search);
-if (params.get('second')) configs.push({ type: 'custom:tesla-view-card', device_id: DEVICE, model: 'standard', paint: 'UltraRed', camera: 'top_down', aspect_ratio: '4:3' } as any);
+const look: any = {};
+for (const k of ['model', 'paint', 'wheels', 'trim', 'plate', 'camera', 'seats', 'cable']) if (params.get(k)) look[k] = params.get(k);
+const configs: any[] = [
+  { type: 'custom:tesla-view-card', device_id: DEVICE, entities: { headlights: 'binary_sensor.ble_headlights' }, ...look },
+];
+if (params.get('second')) configs.push({ type: 'custom:tesla-view-card', device_id: DEVICE, model: params.get('second'), camera: 'top_down', aspect_ratio: '4:3' });
+fetch((window as any).TESLA_VIEW_ASSET_BASE + 'index.json', { cache: 'no-store' }).then(r => { if (!r.ok) throw 0; }).catch(() => { document.getElementById('hint')!.style.display = 'block'; });
 for (const cfg of configs) {
   const card = document.createElement('tesla-view-card') as any;
   card.setConfig(cfg); card.hass = hass; cards.push(card);

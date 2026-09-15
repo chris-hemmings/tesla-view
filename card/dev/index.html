@@ -14,10 +14,10 @@
   tesla-view-card{display:block;max-width:900px}
   ha-card{display:block;background:#1c1c1c;border-radius:12px;box-shadow:0 2px 8px #0008}
 </style>
-<script>window.TESLA_VIEW_ASSET_BASE = location.origin + '/assets/';</script>
+<script>window.TESLA_VIEW_ASSET_BASE = location.origin + '/tesla_view/';</script>
 </head>
 <body>
-<div id="cards"></div>
+<div id="cards"><p id="hint" style="display:none;padding:16px;color:#fa6">No asset pack in the harness – run <code>npm run dev:assets -- path/to/tesla-view-pack-….zip</code> and reload.</p></div>
 <div id="panel"><h3>mock entities</h3><div id="toggles"></div><h3>callService log</h3><div id="log"></div></div>
 <script type="module" src="./mock-hass.ts"></script>
 </body>
