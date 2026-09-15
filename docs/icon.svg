@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#161718"/>
+  <!-- simple, original car silhouette (side view) -->
+  <path d="M40 150 C46 128 62 116 84 110 L118 82 C126 76 136 74 148 76 L184 88 C204 94 214 108 216 126 L218 144 C219 150 214 156 208 156 L48 156 C42 156 38 153 40 150 Z" fill="#e8e8ea"/>
+  <path d="M96 116 L120 92 C124 88 130 86 138 88 L170 98 L172 116 Z" fill="#161718"/>
+  <circle cx="82" cy="160" r="20" fill="#161718"/><circle cx="82" cy="160" r="12" fill="#9a9ca3"/>
+  <circle cx="178" cy="160" r="20" fill="#161718"/><circle cx="178" cy="160" r="12" fill="#9a9ca3"/>
+  <rect x="44" y="120" width="10" height="4" rx="2" fill="#f7f7f7"/>
+</svg>

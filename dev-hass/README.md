@@ -1,37 +1,48 @@
 # dev-hass – throwaway Home Assistant for developing the Tesla View card
 
 A real Home Assistant (Docker, `ghcr.io/home-assistant/home-assistant:stable`) with the integration mounted live from
-`../custom_components`, a set of **dummy Model Y entities** and a YAML dashboard that shows the card next to toggles
-for every state. Use it to test what the mock harness (`card/dev/`) cannot: the integration's Python, the Lovelace
-resource registration, real `hass` objects, the visual editor and the HA theme.
+`../custom_components`, a set of **dummy Model Y entities** and two dashboards. Use it to test what the mock harness
+(`card/dev/`) cannot: the integration's Python (pack upload, repairs, resource registration), real `hass` objects, the
+visual editor and the HA theme.
 
 ## Start
 
 ```bash
 cd dev-hass
-docker compose up -d          # first start pulls the image (~1 GB) and boots HA in ~30 s
-python3 setup.py              # onboarding (owner dev / dev), adds the Tesla View integration, checks entities + bundle
+docker compose up -d                                  # first start pulls the image (~1 GB) and boots HA in ~30 s
+python3 setup.py --pack ../path/to/tesla-view-pack-bayberry.zip
 ```
+
+`setup.py` completes onboarding (owner `dev` / `dev`), adds the Tesla View integration, creates the dashboards, uploads
+the pack through the integration's options flow (`--pack`, optional) and checks the index and the Repairs state. It is
+idempotent; run it again after wiping `ha-config/.storage` or to check the state. It prints a short-lived REST token.
 
 Then log in with `dev` / `dev` and open
 
 - <http://localhost:8123/tesla-view> – YAML dashboard: the card next to controls for every dummy state;
-- <http://localhost:8123/dev-cards> – storage-mode dashboard created by `setup.py` (over the websocket API) so the card's
-  **visual editor** can be used: edit mode → card → *Edit*.
+- <http://localhost:8123/dev-cards> – storage-mode dashboard so the card's **visual editor** can be used: edit mode →
+  card → *Edit*.
 
-`setup.py` is idempotent; run it again after wiping `ha-config/.storage` or to check the state. It prints a short-lived
-REST token for `curl`.
+Without `--pack` the integration raises the *Repairs* item "Tesla View has no asset pack" and the card shows where to
+get one – the state every new user sees first. Build packs with
+[tesla-view-extractor](https://github.com/koenhendriks/tesla-view-extractor).
 
-After changing the card: `cd card && npm run build`. The bundle is served straight from the repo through the mount, so
-no copying – but **Home Assistant's service worker caches `/tesla_view/tesla-view-card.js?v=…` in the browser**, and a
-plain (even hard) refresh keeps serving the old bundle. Either bump `VERSION` in `custom_components/tesla_view/const.py`
-(new URL → cache miss; that is what a release does) or, for quick iterations, clear the service worker once:
-DevTools → Application → Service workers → *Unregister* (+ *Clear storage*), or run in the console
+## Iterating
 
-```js
-navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister())); caches.keys().then(k => k.forEach(c => caches.delete(c))); location.reload();
-``` After changing the **Python** side or `packages/`/`dashboards/`,
-restart HA: `docker compose restart` (or Developer tools → YAML → *All YAML configuration* for the package/dashboard).
+- **Card**: `cd card && npm run build`. The integration folder is bind-mounted, so the new bundle is served at once, but
+  **Home Assistant's service worker caches `/tesla_view/tesla-view-card.js?v=…`** in the browser; a plain (even hard)
+  refresh keeps the old bundle. Bump `VERSION` in `custom_components/tesla_view/const.py` (new URL → cache miss; that is
+  what a release does) or, for quick iterations, clear the service worker once: DevTools → Application → Service
+  workers → *Unregister* (+ *Clear storage*), or in the console
+
+  ```js
+  navigator.serviceWorker.getRegistrations().then(r => r.forEach(x => x.unregister())); caches.keys().then(k => k.forEach(c => caches.delete(c))); location.reload();
+  ```
+
+- **Python** (integration) or `ha-config/packages` / `dashboards`: `docker compose restart` (or Developer tools →
+  YAML → *All YAML configuration* for the package/dashboard).
+- **Packs**: upload via the UI (Configure → Upload), `python3 setup.py --pack file.zip`, or Repairs → Fix. Installed packs
+  live in `ha-config/tesla_view/packs/` (root-owned like everything HA writes, gitignored).
 
 ## What is in `ha-config/`
 
@@ -40,7 +51,7 @@ restart HA: `docker compose restart` (or Developer tools → YAML → *All YAML 
 | `configuration.yaml` | `default_config`, loads `packages/`, declares the YAML dashboard `tesla-view` |
 | `packages/tesla_dummy.yaml` | the dummy vehicle – see below |
 | `dashboards/tesla-view.yaml` | dashboard: Tesla View card (`entities:` mapped to the dummies) + entity cards to flip each state |
-| everything else | runtime state written by HA (`.storage/`, db, logs) – gitignored, owned by root (the container's user) |
+| everything else | runtime state written by HA (`.storage/`, db, logs, `tesla_view/` packs) – gitignored, owned by root |
 
 ## The dummy Model Y
 
@@ -62,7 +73,7 @@ seconds (default 2 s) so the card's optimistic state and confirmation path are e
 30 s to watch the optimistic timeout behaviour.
 
 These are template entities, not a `tesla_fleet` device, so the card is configured with `entities:` rather than
-`device_id` (the visual editor's device picker only lists Tesla Fleet devices).
+`device_id` (the visual editor's device picker only lists Tesla Fleet devices; the entity pickers work for anything).
 
 ## Scripted checks (REST)
 
@@ -71,11 +82,11 @@ TOKEN=$(python3 setup.py | sed -n 's/^access token.*: //p')
 H="Authorization: Bearer $TOKEN"; U=http://localhost:8123
 curl -s -H "$H" $U/api/states/cover.model_y_trunk | jq .state
 curl -s -H "$H" -H 'Content-Type: application/json' -d '{"entity_id":"input_boolean.tesla_charge_cable"}' $U/api/services/input_boolean/turn_on
-curl -s -H "$H" -H 'Content-Type: application/json' -d '{"entity_id":"input_select.tesla_charging_state","option":"charging"}' $U/api/services/input_select/select_option
+curl -s $U/tesla_view_assets/index.json | jq '.models | keys'
 ```
 
 ## Reset
 
 ```bash
-docker compose down && sudo rm -rf ha-config/.storage ha-config/*.db* ha-config/*.log* && docker compose up -d && python3 setup.py
+docker compose down && sudo rm -rf ha-config/.storage ha-config/tesla_view ha-config/*.db* ha-config/*.log* && docker compose up -d && python3 setup.py
 ```
