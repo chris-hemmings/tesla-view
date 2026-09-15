@@ -20,6 +20,8 @@ and upload it once in Home Assistant. See [Asset pack](#asset-pack).
 2. Search for **Tesla View**, download it, restart Home Assistant.
 3. Settings → Devices & services → **Add integration** → *Tesla View*. You can upload your asset pack right there.
 
+Upgrading from a manual 0.1.x install? See [docs/migrating-from-0.1.md](docs/migrating-from-0.1.md).
+
 ### Manual
 
 Download `tesla_view.zip` from the [latest release](https://github.com/koenhendriks/tesla-view/releases), unpack it into
