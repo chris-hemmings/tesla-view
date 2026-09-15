@@ -53,9 +53,9 @@ python3 tools/smoke-server.py                          # built bundle as HA serv
 cd dev-hass && docker compose up -d && python3 setup.py --pack /path/to/pack.zip   # real HA on :8123
 ```
 
-There is no unit test suite for the card; verification is visual (harness, smoke server, dev-hass) – the
-`tesla-view-dev` skill (`.claude/skills/tesla-view-dev/`) describes the loop, including headless checks via Chrome
-DevTools. A pack to test with is produced by the extractor (`tesla-view-extract <bundle> --models bayberry`).
+There is no unit test suite for the card; verification is visual: harness, smoke server, dev-hass, checked in a
+browser (screenshots, console, DOM). A pack to test with is produced by the extractor
+(`tesla-view-extract <bundle> --models bayberry`).
 
 ## Paths and caching
 
