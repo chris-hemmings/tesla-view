@@ -163,7 +163,7 @@ export class TeslaViewCard extends LitElement {
     const v = this.vehicle!, wrap = this.renderRoot.querySelector('.wrap') as HTMLElement, canvas = this.renderRoot.querySelector('canvas') as HTMLElement;
     const st = () => this.effective();
     const items = [
-      { key: 'frunk', object: v.nodes.FrunkMarker, label: () => st().frunk ? 'Frunk open' : 'Open frunk', onToggle: () => { if (!st().frunk) this.command('frunk', 'frunk_open', true); }, enabled: () => !!this.entities.frunk },
+      { key: 'frunk', object: v.nodes.FrunkMarker, label: () => st().frunk ? 'Frunk open (close manually)' : 'Open frunk', onToggle: () => { if (!st().frunk) this.command('frunk', 'frunk_open', true); }, enabled: () => !!this.entities.frunk },
       { key: 'trunk', object: v.nodes.TrunkMarker, label: () => st().trunk ? 'Close trunk' : 'Open trunk', onToggle: () => this.command('trunk', st().trunk ? 'trunk_close' : 'trunk_open', !st().trunk), enabled: () => !!this.entities.trunk },
       { key: 'charge_port', object: v.nodes.ChargePortMarker, label: () => st().charge_port ? 'Close charge port' : 'Open charge port', onToggle: () => this.command('charge_port', st().charge_port ? 'charge_port_close' : 'charge_port_open', !st().charge_port), enabled: () => !!this.entities.charge_port },
       { key: 'lock', object: v.nodes.Lock_Marker, label: () => st().lock ? 'Unlock' : 'Lock', onToggle: () => this.command('lock', st().lock ? 'unlock' : 'lock', !st().lock), enabled: () => !!this.entities.lock, alwaysVisible: true },
