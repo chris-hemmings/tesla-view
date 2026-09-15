@@ -1,5 +1,5 @@
 """Constants for the Tesla View integration."""
 DOMAIN = "tesla_view"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 URL_BASE = "/tesla_view"
 CARD_FILENAME = "tesla-view-card.js"
