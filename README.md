@@ -78,6 +78,7 @@ optimistically for up to 60 s until the entity confirms; failures (e.g. missing 
 | `tools/smoke-server.py` | serves the built bundle under the same `/tesla_view/…` paths Home Assistant uses, for testing without HA |
 | `dev-hass/` | Docker Home Assistant with dummy Model Y entities and a ready dashboard for developing the card – see `dev-hass/README.md` |
 | `extracted/` | everything recovered from the Tesla app (models, textures, materials, decompiled scripts, converters, standalone `viewer.html`) – see `extracted/README.md` |
+| `AGENTS.md`, `.claude/skills/` | working notes for AI coding agents (repo rules, dev/verify/build/release loop) |
 
 ## How the 3D side works
 
