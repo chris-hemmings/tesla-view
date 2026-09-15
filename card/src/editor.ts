@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit';
-import { fetchJson } from './scene/assets';
+import { ASSETS_ROOT, INDEX_REV } from './scene/assets';
+import { PackLoader, type PackIndex, type PackManifest } from './pack';
 import { CHANNELS } from './ha/channels';
 import type { CardConfig, ChannelId, HomeAssistant } from './types';
 
@@ -21,8 +22,8 @@ const CHANNEL_DOMAINS: Record<ChannelId, string[]> = {
 };
 
 const LABELS: Record<string, string> = {
-  device_id: 'Tesla Fleet device', model: 'Model', trim: 'Trim', paint: 'Paint', wheels: 'Wheels', plate: 'Plate', theme: 'Theme',
-  camera: 'Camera', aspect_ratio: 'Aspect ratio', rhd: 'Right-hand drive', hotspots: 'Show hotspots',
+  device_id: 'Tesla Fleet device', model: 'Model', trim: 'Trim', paint: 'Paint', wheels: 'Wheels', plate: 'Plate', seats: 'Seats', cable: 'Charge cable',
+  theme: 'Theme', camera: 'Camera', aspect_ratio: 'Aspect ratio', rhd: 'Right-hand drive', hotspots: 'Show hotspots',
   frunk: 'Frunk', trunk: 'Trunk', charge_port: 'Charge port door', lock: 'Lock',
   door_fl: 'Front left door', door_fr: 'Front right door', door_rl: 'Rear left door', door_rr: 'Rear right door',
   window_fl: 'Front left window', window_fr: 'Front right window', window_rl: 'Rear left window', window_rr: 'Rear right window',
@@ -32,6 +33,7 @@ const LABELS: Record<string, string> = {
 
 const HELPERS: Record<string, string> = {
   device_id: 'Optional. Maps every channel from the Tesla Fleet entity registry; entities below add to or override that mapping.',
+  model: 'Vehicles from your installed asset packs.',
   frunk: 'cover (open/closed) or on/off entity; the hotspot calls cover.open_cover',
   trunk: 'cover or on/off entity; hotspot calls cover.open_cover / close_cover',
   charge_port: 'cover or on/off entity; hotspot calls cover.open_cover / close_cover',
@@ -43,40 +45,57 @@ const HELPERS: Record<string, string> = {
   drl: 'no Tesla Fleet equivalent',
 };
 
-/** Visual editor: device + look + one entity picker per channel. `states:` / `actions:` overrides stay YAML. */
+/** Visual editor: device + look (from the asset pack) + one entity picker per channel. `states:` / `actions:` stay YAML. */
 export class TeslaViewCardEditor extends LitElement {
   hass?: HomeAssistant;
   private config: CardConfig = { type: 'custom:tesla-view-card' };
-  private paints: string[] = ['Quicksilver'];
+  private index: PackIndex | null | undefined = undefined;   // undefined = loading
+  private manifest?: PackManifest;
+  private manifestFor = '';
+  private packs = new PackLoader(ASSETS_ROOT);
 
-  static properties = { hass: {}, config: { state: true }, paints: { state: true } } as any;
+  static properties = { hass: {}, config: { state: true }, index: { state: true }, manifest: { state: true } } as any;
 
-  setConfig(config: CardConfig) { this.config = { ...config }; }
+  setConfig(config: CardConfig) { this.config = { ...config }; this.loadManifest(); }
   connectedCallback() {
     super.connectedCallback();
-    fetchJson<{ colors: Record<string, any> }>('paint-colors.json').then(p => { this.paints = Object.keys(p.colors); this.requestUpdate(); }).catch(() => {});
+    this.packs.index(INDEX_REV).then(idx => { this.index = idx; this.loadManifest(); }).catch(() => { this.index = null; });
+  }
+  private modelPick() { return PackLoader.resolveModel(this.index || null, this.config.model); }
+  private async loadManifest() {
+    const pick = this.modelPick(); if (!pick || !this.index) return;
+    if (this.manifestFor === pick.entry.pack) return;
+    this.manifestFor = pick.entry.pack;
+    try { this.manifest = await this.packs.manifest(this.index, pick.entry.pack); } catch { this.manifest = undefined; }
+    this.requestUpdate();
   }
 
   private schema() {
-    const sel = (opts: string[]) => ({ select: { mode: 'dropdown', options: opts.map(o => ({ value: o, label: o })) } });
+    const sel = (opts: { value: string; label: string }[]) => ({ select: { mode: 'dropdown', options: opts } });
+    const plain = (opts: string[]) => sel(opts.map(o => ({ value: o, label: o })));
     const entity = (ch: ChannelId) => ({ name: ch, selector: { entity: { domain: CHANNEL_DOMAINS[ch] } } });
     const group = (chs: ChannelId[]) => chs.map(entity);
+    const idx = this.index, pick = this.modelPick(), m = this.manifest;
+    const look: any[] = [];
+    if (idx && pick) {
+      const entry = pick.entry;
+      look.push({ name: 'model', selector: sel(Object.entries(idx.models).map(([id, mm]) => ({ value: id, label: mm.name }))) });
+      if (entry.variants.includes('performance')) look.push({ name: 'trim', selector: plain(['premium', 'performance']) });
+      if (m) look.push({ name: 'paint', selector: sel([{ value: '', label: 'Pack default' }, ...Object.keys(m.paints?.colors || {}).map(o => ({ value: o, label: o }))]) });
+      if (entry.wheels.length) look.push({ name: 'wheels', selector: plain(entry.wheels) });
+      if (entry.variants.includes('plate_eu') && entry.variants.includes('plate_us')) look.push({ name: 'plate', selector: plain(['eu', 'us']) });
+      if (entry.variants.includes('seats_7')) look.push({ name: 'seats', selector: sel([{ value: '5', label: '5' }, { value: '7', label: '7' }]) });
+      if (m && Object.keys(m.cables || {}).length > 1) look.push({ name: 'cable', selector: plain(['auto', ...Object.keys(m.cables)]) });
+      look.push({ name: 'theme', selector: plain(['auto', 'dark', 'light']) });
+      look.push({ name: 'camera', selector: plain([...Object.keys(m?.environment?.presets || { parked: 1, top_down: 1 }), 'free']) });
+      look.push({ name: 'aspect_ratio', selector: { text: {} } });
+    }
+    const flags: any[] = [{ name: 'hotspots', selector: { boolean: {} } }];
+    if (pick?.entry.variants.includes('rhd')) flags.unshift({ name: 'rhd', selector: { boolean: {} } });
     return [
       { name: 'device_id', selector: { device: { filter: { integration: 'tesla_fleet' } } } },
-      { type: 'grid', name: '', schema: [
-        { name: 'model', selector: sel(['juniper', 'standard']) },
-        { name: 'trim', selector: sel(['premium', 'performance']) },
-        { name: 'paint', selector: sel(this.paints) },
-        { name: 'wheels', selector: sel(['Crossflow19', 'HelixV220', 'HelixV220Dark']) },
-        { name: 'plate', selector: sel(['eu', 'us']) },
-        { name: 'theme', selector: sel(['auto', 'dark', 'light']) },
-        { name: 'camera', selector: sel(['parked', 'top_down', 'free']) },
-        { name: 'aspect_ratio', selector: { text: {} } },
-      ] },
-      { type: 'grid', name: '', schema: [
-        { name: 'rhd', selector: { boolean: {} } },
-        { name: 'hotspots', selector: { boolean: {} } },
-      ] },
+      ...(look.length ? [{ type: 'grid', name: '', schema: look }] : []),
+      { type: 'grid', name: '', schema: flags },
       { type: 'expandable', name: 'entities', title: 'Entities', icon: 'mdi:car-connected',
         expanded: !this.config.device_id && !!this.config.entities && Object.keys(this.config.entities).length > 0,
         schema: [
@@ -99,15 +118,27 @@ export class TeslaViewCardEditor extends LitElement {
     for (const ch of CHANNELS) { const id = (value.entities as any)?.[ch]; if (id) entities[ch] = id; }
     if (Object.keys(entities).length) value.entities = entities; else delete value.entities;
     if (!value.device_id) delete value.device_id;
+    if (!value.paint) delete value.paint;
+    if ((value as any).seats !== undefined) (value as any).seats = Number((value as any).seats) === 7 ? 7 : 5;
     this.config = value;
+    this.loadManifest();
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this.config }, bubbles: true, composed: true }));
   }
 
   render() {
     if (!this.hass) return html``;
-    const data = { model: 'juniper', trim: 'premium', paint: 'Quicksilver', wheels: 'Crossflow19', plate: 'eu', theme: 'auto', camera: 'parked', aspect_ratio: '16:9', hotspots: true, ...this.config, entities: { ...(this.config.entities || {}) } };
-    return html`<ha-form .hass=${this.hass} .data=${data} .schema=${this.schema()} .computeLabel=${this.label} .computeHelper=${this.helper}
-      @value-changed=${(ev: CustomEvent) => this.onChange(ev)}></ha-form>`;
+    const pick = this.modelPick();
+    const noPack = this.index !== undefined && !pick;
+    const defaults: any = { trim: 'premium', plate: 'eu', seats: '5', cable: 'auto', theme: 'auto', camera: 'parked', aspect_ratio: '16:9', hotspots: true };
+    if (pick) { defaults.model = pick.id; defaults.wheels = pick.entry.default_wheel; }
+    const data = { ...defaults, ...this.config, seats: String((this.config as any).seats ?? 5), entities: { ...(this.config.entities || {}) } };
+    return html`
+      ${noPack ? html`<ha-alert alert-type="warning" title="No asset pack installed">
+        Build one from your copy of the Tesla app with
+        <a href="https://github.com/koenhendriks/tesla-view-extractor" target="_blank" rel="noopener">tesla-view-extractor</a> and upload it under
+        <a href="/config/integrations/integration/tesla_view">Settings → Devices &amp; services → Tesla View → Configure</a>.</ha-alert>` : ''}
+      <ha-form .hass=${this.hass} .data=${data} .schema=${this.schema()} .computeLabel=${this.label} .computeHelper=${this.helper}
+        @value-changed=${(ev: CustomEvent) => this.onChange(ev)}></ha-form>`;
   }
 }
 customElements.define('tesla-view-card-editor', TeslaViewCardEditor);

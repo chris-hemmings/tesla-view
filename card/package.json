@@ -1,11 +1,12 @@
 {
   "name": "tesla-view-card",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "python3 ../tools/build-assets.py && tsc --noEmit && vite build",
+    "dev:assets": "python3 ../tools/dev-assets.py",
+    "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

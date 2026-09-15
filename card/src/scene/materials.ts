@@ -4,7 +4,7 @@ import { TextureCache } from './assets';
 /** Paint definition from paint-colors.json (what the Tesla app feeds its paint shader). */
 export interface Paint { albedo: string; metallic: number; roughness: number }
 
-/** Normalised material description produced by tools/godot2three.py (see extracted/README.md). */
+/** Normalised material description from the asset pack's *.overrides.json (tesla-view-extractor). */
 export interface MaterialDesc {
   name?: string; kind: string; source?: string; params?: Record<string, any>;
   albedo?: number[]; alpha?: number; albedo_texture?: string | null;
@@ -23,7 +23,7 @@ export interface MaterialDesc {
  */
 export class MaterialFactory {
   private cache = new Map<string, THREE.Material>();
-  constructor(public readonly textures: TextureCache, public paint: Paint, private gamma = true) {}
+  constructor(public readonly textures: TextureCache, public paint: Paint, private gamma = true, private roughRoughness = 1.0) {}
 
   /** Godot colours are sRGB values; GLES2 uses them untransformed. */
   color(rgb: number[]) {
@@ -48,7 +48,7 @@ export class MaterialFactory {
       // Vehicle.gd gives paint_rough_material the same colour/metallic with roughness 1.0.
       const isPaint = desc.kind === 'car_paint';
       const pm = new THREE.MeshPhysicalMaterial({
-        color: this.paintColor(), metalness: this.paint.metallic, roughness: isPaint ? this.paint.roughness : 1.0,
+        color: this.paintColor(), metalness: this.paint.metallic, roughness: isPaint ? this.paint.roughness : this.roughRoughness,
         clearcoat: isPaint && !this.gamma ? 1.0 : 0.0, clearcoatRoughness: 0.06, side,
       });
       const ao = desc.params?.ao || desc.ao_texture;
@@ -98,7 +98,7 @@ export class MaterialFactory {
       }
       if (P.blend_mode === 1) { mm.blending = THREE.AdditiveBlending; mm.transparent = true; mm.depthWrite = false; }
     } else {
-      m = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 });   // unsupported (binary) material
+      m = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6, metalness: 0.5 });   // binary_unsupported / missing / unknown shader: neutral dark metal
     }
     m.name = desc.name || key;
     m.userData.renderPriority = desc.render_priority || 0;

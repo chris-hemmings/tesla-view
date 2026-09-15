@@ -2,22 +2,27 @@ import { LitElement, html, css, type PropertyValues } from 'lit';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js';
-import { assetUrl, fetchJson, TextureCache } from './scene/assets';
-import { MaterialFactory, type Paint } from './scene/materials';
-import { Vehicle, type ModelId, WHEELS } from './scene/vehicle';
+import { ASSETS_ROOT, INDEX_REV, assetUrl, TextureCache } from './scene/assets';
+import { MaterialFactory } from './scene/materials';
+import { Vehicle } from './scene/vehicle';
+import { PackLoader, resolvePaint, type EnvPreset, type PackEnvironment, type PackIndex, type PackManifest } from './pack';
 import { createHotspots } from './hotspots';
 import { actionFor, readBool, readCharging, resolveEntities, runAction } from './ha/channels';
 import type { CardConfig, ChannelId, HomeAssistant, VehicleState } from './types';
 import './editor';
 
-/*  The Tesla app's rendering, reproduced (see extracted/README.md "Lighting"): Godot 3.2 GLES2 → gamma-space shading,
- *  no lamps, one studio panorama for reflections + ambient (background_energy 4, ambient_light_energy 4, sky rotation
- *  (0,-7,83)°), fov 40 camera on a pivot rotated (68.6,-138,0)°, background #161718 dark / #F7F7F7 light.            */
-const APP = { panorama: 'shared/environment/studio/New_Studio.png', envEnergy: 4, ambEnergy: 4, skyRotDeg: [0, -7, 83],
-  cameras: { parked: { pivot: [68.6, -138, 0], dist: 5.6 }, top_down: { pivot: [0, 0, 0], dist: 7.5 }, free: { pivot: [68.6, -138, 0], dist: 5.6 } },
-  bg: { dark: 0x161718, light: 0xf7f7f7 } };
+const DOCS_URL = 'https://github.com/koenhendriks/tesla-view';
+const DOCS_PACK_URL = DOCS_URL + '#asset-pack';
 
-const DEFAULTS: Partial<CardConfig> = { model: 'juniper', trim: 'premium', paint: 'Quicksilver', wheels: 'Crossflow19', plate: 'eu', theme: 'auto', camera: 'parked', aspect_ratio: '16:9', hotspots: true };
+/*  Everything model-specific (node names, animations, lights, markers) and the app's lighting/camera presets come from
+ *  the asset pack manifest; this file only holds behaviour. The app renders in Godot 3.2 GLES2 (gamma-space shading,
+ *  no lamps, one studio panorama) – reproduced here with NoToneMapping + LinearSRGB output and raw textures.       */
+
+/** The app frames the car for a phone in portrait; the card is wider. Scale the preset camera distance to fit. */
+const CAMERA_FIT = 0.84;
+
+const DEFAULTS: Partial<CardConfig> = { trim: 'premium', plate: 'eu', seats: 5, cable: 'auto', theme: 'auto', camera: 'parked', aspect_ratio: '16:9', hotspots: true };
+const LOAD_KEYS: (keyof CardConfig)[] = ['model', 'trim', 'paint', 'wheels', 'plate', 'seats', 'cable', 'rhd', 'hotspots'];
 
 interface Pending { value: any; since: string | undefined; until: number }
 
@@ -29,9 +34,14 @@ export class TeslaViewCard extends LitElement {
     canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     .msg { position: absolute; left: 12px; bottom: 10px; font: 12px var(--mdc-typography-font-family, system-ui); color: var(--secondary-text-color, #aaa); pointer-events: none; }
     .err { color: var(--error-color, #f66); }
+    .nopack { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center;
+             font: 14px/1.4 var(--mdc-typography-font-family, system-ui); color: var(--primary-text-color, #eee); background: var(--card-background-color, #1c1c1c); }
+    .nopack b { font-size: 16px; }
+    .nopack a { color: var(--primary-color, #03a9f4); }
+    .nopack .sub { color: var(--secondary-text-color, #aaa); font-size: 12px; }
   `;
 
-  static getStubConfig() { return { model: 'juniper', paint: 'Quicksilver', wheels: 'Crossflow19' }; }
+  static getStubConfig() { return {}; }
   static getConfigElement() { return document.createElement('tesla-view-card-editor'); }
 
   private _hass!: HomeAssistant;
@@ -41,12 +51,21 @@ export class TeslaViewCard extends LitElement {
   private state: Partial<VehicleState> = {};
   private message = '';
   private error = '';
+  private noPack = false;
+
+  // asset pack
+  private packs = new PackLoader(ASSETS_ROOT);
+  private index: PackIndex | null = null;
+  private manifest?: PackManifest;
+  private base = ASSETS_ROOT;
+  private envBase = '';
 
   // three.js
   private renderer?: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 150);
   private controls?: OrbitControls;
+  private probe?: THREE.LightProbe;
   private vehicle?: Vehicle;
   private factory?: MaterialFactory;
   private hotspots?: ReturnType<typeof createHotspots>;
@@ -60,7 +79,8 @@ export class TeslaViewCard extends LitElement {
     if (!config) throw new Error('Invalid configuration');
     const prev = this.config;
     this.config = { ...DEFAULTS, ...config } as CardConfig;
-    if (!prev || ['model', 'trim', 'paint', 'wheels', 'plate', 'rhd', 'hotspots'].some(k => (prev as any)[k] !== (this.config as any)[k])) this.loadVehicle();
+    if (!prev || LOAD_KEYS.some(k => (prev as any)[k] !== (this.config as any)[k])) this.loadVehicle();
+    else if (prev.camera !== this.config.camera) { this.firstSync = true; this.applyPreset(); }
     if (this._hass) this.resolve();
     this.requestUpdate();
   }
@@ -76,7 +96,13 @@ export class TeslaViewCard extends LitElement {
 
   render() {
     const style = this.config?.height ? `height:${this.config.height}px` : `aspect-ratio:${(this.config?.aspect_ratio || '16:9').replace(':', '/')}`;
-    return html`<ha-card><div class="wrap" style=${style}><canvas></canvas><div class="msg ${this.error ? 'err' : ''}">${this.error || this.message}</div></div></ha-card>`;
+    return html`<ha-card><div class="wrap" style=${style}><canvas></canvas>
+      ${this.noPack ? html`<div class="nopack"><b>No asset pack installed</b>
+        <span>Tesla View needs the 3D assets from your copy of the Tesla app. Build a pack with
+          <a href="https://github.com/koenhendriks/tesla-view-extractor" target="_blank" rel="noopener">tesla-view-extractor</a> and upload it under
+          <a href="/config/integrations/integration/tesla_view">Settings → Devices &amp; services → Tesla View → Configure</a>.</span>
+        <span class="sub"><a href=${DOCS_PACK_URL} target="_blank" rel="noopener">How it works</a></span></div>` : ''}
+      <div class="msg ${this.error ? 'err' : ''}">${this.error || this.message}</div></div></ha-card>`;
   }
 
   // ---------- lifecycle ----------
@@ -93,7 +119,6 @@ export class TeslaViewCard extends LitElement {
     this.controls.addEventListener('change', () => this.wake(120));
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.renderRoot.querySelector('.wrap')!);
     this.io = new IntersectionObserver(es => { this.visible = es.some(e => e.isIntersecting); if (this.visible) this.wake(200); }); this.io.observe(this);
-    this.setupEnvironment().then(() => this.wake(200));
     this.applyTheme(); this.resize();
     if (this.config && !this.vehicle) this.loadVehicle();
   }
@@ -107,32 +132,48 @@ export class TeslaViewCard extends LitElement {
     this.renderer.setSize(w, h, false); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     this.placeCamera(); this.wake(100);
   }
+
+  // ---------- environment / camera presets (from the pack) ----------
+  private preset(): EnvPreset | undefined {
+    const env = this.manifest?.environment; if (!env) return undefined;
+    const name = this.config?.camera || 'parked';
+    return env.presets[name] || env.presets[env.fallback] || Object.values(env.presets)[0];
+  }
   private placeCamera() {
     if (this.config?.camera === 'free' && this.controls && this.camera.position.lengthSq() > 0.01 && !this.firstSync) return;
-    const cam = APP.cameras[this.config?.camera || 'parked'] || APP.cameras.parked;
-    const e = new THREE.Euler(...(cam.pivot.map(THREE.MathUtils.degToRad) as [number, number, number]), 'YXZ');
-    const dist = cam.dist * Math.max(1, 1.5 / this.camera.aspect);              // narrow cards: back off so the car fits
-    this.camera.position.set(0, dist, 0).applyEuler(e).add(new THREE.Vector3(0, 0.6, 0));
-    this.controls?.target.set(0, 0.6, 0); this.controls?.update();
+    const p = this.preset(); if (!p) return;
+    const e = new THREE.Euler(...(p.camera.pivot_deg.map(THREE.MathUtils.degToRad) as [number, number, number]), 'YXZ');
+    const target = new THREE.Vector3().fromArray(p.camera.target || [0, 0.6, 0]);
+    const offset = new THREE.Vector3().fromArray(p.camera.offset).multiplyScalar(CAMERA_FIT * Math.max(1, 1.5 / this.camera.aspect));   // narrow cards: back off so the car fits
+    this.camera.position.copy(offset).applyEuler(e).add(target);
+    this.controls?.target.copy(target); this.controls?.update();
+  }
+  private applyPreset() {
+    const p = this.preset(), env = this.manifest?.environment; if (!p || !env) return;
+    this.camera.fov = env.fov || 40; this.camera.updateProjectionMatrix();
+    this.scene.environmentIntensity = p.env_energy;
+    this.scene.environmentRotation.set(...(p.sky_rot_deg.map(THREE.MathUtils.degToRad) as [number, number, number]), 'YXZ');
+    if (this.probe) this.probe.intensity = p.env_energy * (p.amb_energy - 1);   // Godot: ambient = irradiance × bg_energy × ambient_energy
+    this.placeCamera(); this.wake(200);
   }
   private applyTheme() {
     const t = this.config?.theme || 'auto';
     const dark = t === 'dark' ? true : t === 'light' ? false : (this._hass?.themes?.darkMode ?? true);
-    this.scene.background = new THREE.Color(dark ? APP.bg.dark : APP.bg.light); this.wake(50);
+    const bg = this.manifest?.environment?.bg || { dark: '#161718', light: '#F7F7F7' };
+    this.scene.background = new THREE.Color(dark ? bg.dark : bg.light); this.wake(50);
   }
-
-  private async setupEnvironment() {
-    if (!this.renderer) return;
-    const pano = await new Promise<THREE.Texture>((res, rej) => new THREE.TextureLoader().load(assetUrl(APP.panorama), res, undefined, rej));
+  private async setupEnvironment(env: PackEnvironment, base: string) {
+    if (!this.renderer || !env.panorama || this.envBase === base) return;
+    this.envBase = base;
+    const pano = await new Promise<THREE.Texture>((res, rej) => new THREE.TextureLoader().load(assetUrl(env.panorama!, base), res, undefined, rej));
     pano.colorSpace = THREE.NoColorSpace; pano.mapping = THREE.EquirectangularReflectionMapping;
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromEquirectangular(pano).texture;
-    this.scene.environmentIntensity = APP.envEnergy;
-    this.scene.environmentRotation.set(...(APP.skyRotDeg.map(THREE.MathUtils.degToRad) as [number, number, number]), 'YXZ');
     const cube = new THREE.WebGLCubeRenderTarget(128).fromEquirectangularTexture(this.renderer, pano);
     const probe = await LightProbeGenerator.fromCubeRenderTarget(this.renderer, cube);
-    probe.intensity = APP.envEnergy * (APP.ambEnergy - 1);       // Godot: ambient = irradiance × bg_energy × ambient_energy
-    this.scene.add(probe); pmrem.dispose();
+    if (this.probe) this.scene.remove(this.probe);
+    this.probe = probe; this.scene.add(probe); pmrem.dispose();
+    this.applyPreset();
   }
 
   // ---------- vehicle ----------
@@ -141,19 +182,31 @@ export class TeslaViewCard extends LitElement {
     const token = ++this.loadToken;
     this.message = 'loading…'; this.error = ''; this.requestUpdate();
     try {
-      const paints = await fetchJson<{ colors: Record<string, Paint> }>('paint-colors.json');
-      const paint = paints.colors[this.config.paint!] || paints.colors.Quicksilver;
-      const textures = new TextureCache(true);
-      const factory = new MaterialFactory(textures, paint, true);
-      const v = await Vehicle.load({ model: (this.config.model || 'juniper') as ModelId, trim: this.config.trim, rhd: (this.config as any).rhd, plate: this.config.plate, wheels: this.config.wheels, factory });
+      this.index = await this.packs.index(INDEX_REV);
+      const pick = PackLoader.resolveModel(this.index, this.config.model);
+      if (token !== this.loadToken) return;
+      if (!pick) { this.noPack = true; this.message = ''; this.requestUpdate(); return; }
+      this.noPack = false;
+      const manifest = await this.packs.manifest(this.index!, pick.entry.pack);
+      const base = this.packs.baseOf(this.index!, pick.entry.pack);
+      const gamma = (manifest.environment?.renderer || 'gles2_gamma') === 'gles2_gamma';
+      const { paint } = resolvePaint(manifest, this.config.paint);
+      const textures = new TextureCache(gamma, base);
+      const factory = new MaterialFactory(textures, paint, gamma, 1.0);
+      const v = await Vehicle.load({
+        manifest, modelId: pick.id, base, factory, performance: this.config.trim === 'performance', rhd: !!this.config.rhd,
+        plate: this.config.plate, seats7: this.config.seats === 7, wheels: this.config.wheels, cable: this.config.cable,
+      });
       if (token !== this.loadToken) return;                        // superseded by a newer config
       if (this.vehicle) { this.scene.remove(this.vehicle.root); this.vehicle.dispose(); this.factory?.dispose(); }
       this.hotspots?.dispose();
+      this.manifest = manifest; this.base = base;
       this.vehicle = v; this.factory = factory; this.scene.add(v.root);
-      this.firstSync = true; this.placeCamera();
+      this.firstSync = true; this.applyTheme(); this.applyPreset();
       if (this.config.hotspots !== false) this.buildHotspots();
       this.message = '';
       if (this._hass) this.syncState();
+      this.setupEnvironment(manifest.environment, base).catch(e => console.warn('tesla-view-card: environment', e));
       this.wake(300);
     } catch (e: any) { this.error = `Tesla View: ${e?.message || e}`; console.error(e); }
     this.requestUpdate();
@@ -163,11 +216,11 @@ export class TeslaViewCard extends LitElement {
     const v = this.vehicle!, wrap = this.renderRoot.querySelector('.wrap') as HTMLElement, canvas = this.renderRoot.querySelector('canvas') as HTMLElement;
     const st = () => this.effective();
     const items = [
-      { key: 'frunk', object: v.nodes.FrunkMarker, label: () => st().frunk ? 'Frunk open (close manually)' : 'Open frunk', onToggle: () => { if (!st().frunk) this.command('frunk', 'frunk_open', true); }, enabled: () => !!this.entities.frunk },
-      { key: 'trunk', object: v.nodes.TrunkMarker, label: () => st().trunk ? 'Close trunk' : 'Open trunk', onToggle: () => this.command('trunk', st().trunk ? 'trunk_close' : 'trunk_open', !st().trunk), enabled: () => !!this.entities.trunk },
-      { key: 'charge_port', object: v.nodes.ChargePortMarker, label: () => st().charge_port ? 'Close charge port' : 'Open charge port', onToggle: () => this.command('charge_port', st().charge_port ? 'charge_port_close' : 'charge_port_open', !st().charge_port), enabled: () => !!this.entities.charge_port },
-      { key: 'lock', object: v.nodes.Lock_Marker, label: () => st().lock ? 'Unlock' : 'Lock', onToggle: () => this.command('lock', st().lock ? 'unlock' : 'lock', !st().lock), enabled: () => !!this.entities.lock, alwaysVisible: true },
-      { key: 'flash_lights', object: v.nodes.LightsAnchor, label: () => 'Flash lights', onToggle: () => this.command('flash_lights', 'flash_lights', true), enabled: () => !!this.entities.flash_lights, normal: [0, 0.3, -1] as [number, number, number] },
+      { key: 'frunk', object: v.markers.frunk, label: () => st().frunk ? 'Frunk open (close manually)' : 'Open frunk', onToggle: () => { if (!st().frunk) this.command('frunk', 'frunk_open', true); }, enabled: () => !!this.entities.frunk },
+      { key: 'trunk', object: v.markers.trunk, label: () => st().trunk ? 'Close trunk' : 'Open trunk', onToggle: () => this.command('trunk', st().trunk ? 'trunk_close' : 'trunk_open', !st().trunk), enabled: () => !!this.entities.trunk },
+      { key: 'charge_port', object: v.markers.charge_port, label: () => st().charge_port ? 'Close charge port' : 'Open charge port', onToggle: () => this.command('charge_port', st().charge_port ? 'charge_port_close' : 'charge_port_open', !st().charge_port), enabled: () => !!this.entities.charge_port },
+      { key: 'lock', object: v.markers.lock, label: () => st().lock ? 'Unlock' : 'Lock', onToggle: () => this.command('lock', st().lock ? 'unlock' : 'lock', !st().lock), enabled: () => !!this.entities.lock, alwaysVisible: true },
+      { key: 'flash_lights', object: v.markers.lights, label: () => 'Flash lights', onToggle: () => this.command('flash_lights', 'flash_lights', true), enabled: () => !!this.entities.flash_lights, normal: [0, 0.3, -1] as [number, number, number] },
     ].filter(i => i.object);
     this.hotspots = createHotspots({ camera: this.camera, canvas, occluder: v.root, container: wrap, items, onHoverChange: () => this.wake(300) });
   }
@@ -178,7 +231,7 @@ export class TeslaViewCard extends LitElement {
     this.firstSync = true;
     this.syncState();
     const mapped = Object.keys(this.entities).length;
-    this.message = mapped ? '' : this.config.device_id || this.config.entities ? 'no matching entities found' : 'configure device_id or entities';
+    this.message = mapped || this.noPack ? '' : this.config.device_id || this.config.entities ? 'no matching entities found' : 'configure device_id or entities';
     this.requestUpdate();
   }
   /** raw entity-derived state */
@@ -252,5 +305,4 @@ export class TeslaViewCard extends LitElement {
 
 customElements.define('tesla-view-card', TeslaViewCard);
 (window as any).customCards = (window as any).customCards || [];
-(window as any).customCards.push({ type: 'tesla-view-card', name: 'Tesla View', description: 'Interactive 3D view of your Tesla driven by Home Assistant entities', preview: false, documentationURL: 'https://git.pixelfy.nl/koenhendriks/tesla-view' });
-export { WHEELS };
+(window as any).customCards.push({ type: 'tesla-view-card', name: 'Tesla View', description: 'Interactive 3D view of your Tesla driven by Home Assistant entities', preview: false, documentationURL: DOCS_URL });

@@ -32,13 +32,16 @@ export interface ActionConfig {
 export interface CardConfig {
   type: string;
   device_id?: string;
-  model?: 'juniper' | 'standard';
+  model?: string;                 // model id / alias / codename from the asset pack (default: the pack's default model)
   trim?: 'premium' | 'performance';
-  paint?: string;
-  wheels?: string;
+  paint?: string;                 // paint name from the pack
+  wheels?: string;                // API wheel name from the pack (e.g. Crossflow19)
   plate?: 'eu' | 'us';
+  seats?: 5 | 7;
+  cable?: string;                 // auto | CCS | EU | US …
+  rhd?: boolean;
   theme?: 'auto' | 'dark' | 'light';
-  camera?: 'parked' | 'top_down' | 'free';
+  camera?: string;                // preset name from the pack (parked, top_down, charging, …) or "free"
   aspect_ratio?: string;          // e.g. "16:9"
   height?: number;                // px, overrides aspect_ratio
   hotspots?: boolean;
