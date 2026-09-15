@@ -1,0 +1,7 @@
+{
+  "name": "Tesla View",
+  "homeassistant": "2024.7.0",
+  "zip_release": true,
+  "filename": "tesla_view.zip",
+  "hide_default_branch": true
+}

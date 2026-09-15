@@ -1,0 +1,67 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  card:
+    name: card typecheck + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: card/package-lock.json
+      - run: npm ci
+        working-directory: card
+      - run: npm run typecheck
+        working-directory: card
+      - run: npm run build
+        working-directory: card
+      - name: bundle must be self-contained
+        run: '! grep -qE "cdn\.jsdelivr|unpkg\.com" custom_components/tesla_view/frontend/tesla-view-card.js'
+
+  python:
+    name: integration compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m compileall -q custom_components tools dev-hass/setup.py
+      - run: python -c "import json,sys; a=json.load(open('custom_components/tesla_view/strings.json')); b=json.load(open('custom_components/tesla_view/translations/en.json')); sys.exit(0 if a==b else 'strings.json and translations/en.json differ')"
+      - name: versions in sync
+        run: |
+          set -e
+          V1=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' custom_components/tesla_view/const.py)
+          V2=$(python -c "import json;print(json.load(open('custom_components/tesla_view/manifest.json'))['version'])")
+          V3=$(python -c "import json;print(json.load(open('card/package.json'))['version'])")
+          echo "const.py=$V1 manifest=$V2 package.json=$V3"
+          test "$V1" = "$V2" -a "$V1" = "$V3"

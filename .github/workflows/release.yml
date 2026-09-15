@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: card/package-lock.json
+      - name: tag must match the version fields
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME#v}"
+          V1=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' custom_components/tesla_view/const.py)
+          V2=$(python3 -c "import json;print(json.load(open('custom_components/tesla_view/manifest.json'))['version'])")
+          V3=$(python3 -c "import json;print(json.load(open('card/package.json'))['version'])")
+          echo "tag=$TAG const.py=$V1 manifest=$V2 package.json=$V3"
+          test "$TAG" = "$V1" -a "$TAG" = "$V2" -a "$TAG" = "$V3"
+      - run: npm ci
+        working-directory: card
+      - run: npm run build
+        working-directory: card
+      - name: zip the integration (contents at the zip root, as HACS expects)
+        run: |
+          cd custom_components/tesla_view
+          rm -rf __pycache__ frontend/assets
+          zip -r "$GITHUB_WORKSPACE/tesla_view.zip" . -x '__pycache__/*' '*.pyc'
+          unzip -l "$GITHUB_WORKSPACE/tesla_view.zip" | tail -3
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: tesla_view.zip
+          generate_release_notes: true

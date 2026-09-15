@@ -1,0 +1,15 @@
+# Second, clean Home Assistant for testing the HACS install path (nothing bind-mounted from the repo).
+#   docker compose -f docker-compose.hacs.yaml up -d
+#   docker exec homeassistant-hacs bash -c "wget -O - https://get.hacs.xyz | bash -"   # install HACS, then restart
+#   → onboard on http://localhost:8124, add HACS (GitHub device login), HACS → custom repositories →
+#     https://github.com/koenhendriks/tesla-view (Integration) → download → restart → Add integration → Tesla View
+services:
+  homeassistant-hacs:
+    container_name: homeassistant-hacs
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - ./ha-config-hacs:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    ports:
+      - "8124:8123"

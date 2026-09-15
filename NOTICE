@@ -1,0 +1,12 @@
+Tesla View – notice
+
+This repository contains only original code (MIT, see LICENSE). It contains no 3D models, textures, animations,
+scripts or other material from Tesla, Inc.
+
+The card renders your car from an "asset pack" that you, the user, extract from your own copy of the Tesla mobile app
+with tesla-view-extractor (https://github.com/koenhendriks/tesla-view-extractor). That material is the property of
+Tesla, Inc., is produced on your machine for your personal use, and must not be redistributed. Neither this project
+nor its maintainers distribute asset packs.
+
+Tesla, Model 3, Model S, Model X, Model Y and Cybertruck are trademarks of Tesla, Inc. This project is an independent,
+community-made integration and is not affiliated with, endorsed by or supported by Tesla, Inc.
