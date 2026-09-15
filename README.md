@@ -8,6 +8,9 @@ or any other entity you map (BLE, MQTT, …).
 
 ![demo](./demo/demo.gif)
 
+Or combine it with existing card and enable hot spots to control
+![card](./demo/card.gif)
+
 The 3D assets are **not** included: they belong to Tesla and live inside the Tesla mobile app. You build an *asset
 pack* from your own copy of the app with [tesla-view-extractor](https://github.com/koenhendriks/tesla-view-extractor)
 and upload it once in Home Assistant. See [Asset pack](#asset-pack).
