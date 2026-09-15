@@ -16,7 +16,9 @@ other entity you map (BLE, MQTT…).
 3. Settings → Devices & services → **Add integration** → *Tesla View*. This serves the card at `/tesla_view/…` and
    registers `tesla-view-card.js` as a dashboard resource (storage-mode dashboards; in YAML mode add the resource
    printed in the log manually).
-4. Add a card: *Manual* → paste the YAML below, or pick **Tesla View** from the card picker and use the visual editor.
+4. Add a card: pick **Tesla View** from the card picker and use the visual editor (device, look, and an *Entities*
+   section with a picker per channel – any integration's entities work, not only Tesla Fleet), or *Manual* → paste the
+   YAML below.
 
 ## Card configuration
 
@@ -40,7 +42,7 @@ With `device_id` the card reads the Tesla Fleet entity registry and maps every c
 (`vehicle_state_ft` → frunk, `vehicle_state_rt` → trunk, `charge_state_charge_port_door_open` → charge port,
 `vehicle_state_locked` → lock, `vehicle_state_df/pf/dr/pr` → doors, `…_window` → windows, `charge_state_conn_charge_cable`
 → cable, `charge_state_charging_state` → charging, `flash_lights` → flash). Any channel can be pointed at any entity from
-any integration instead – useful for local BLE data:
+any integration instead – in the visual editor (*Entities* section) or in YAML – useful for local BLE data:
 
 ```yaml
 entities:
@@ -63,7 +65,7 @@ actions:                                      # override the service a hotspot c
 rhd: false                                    # right-hand drive: swaps driver/passenger sides and the dashboard
 ```
 
-Default readers: `cover` open/opening → open, `lock` locked → locked, everything else `on`. Commands are shown
+`states:` and `actions:` are YAML-only. Default readers: `cover` open/opening → open, `lock` locked → locked, everything else `on`. Commands are shown
 optimistically for up to 60 s until the entity confirms; failures (e.g. missing vehicle command key) show a toast.
 
 ## Repository layout
