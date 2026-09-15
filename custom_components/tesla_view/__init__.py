@@ -17,6 +17,7 @@ from pathlib import Path
 from homeassistant.components.file_upload import process_uploaded_file
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
 
 from . import packs
@@ -25,10 +26,7 @@ from .const import ASSETS_URL_BASE, CARD_FILENAME, DOCS_PACK_URL, DOMAIN, ISSUE_
 _LOGGER = logging.getLogger(__name__)
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 CARD_URL = f"{URL_BASE}/{CARD_FILENAME}"
-
-
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    return True
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
