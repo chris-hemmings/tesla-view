@@ -3,6 +3,8 @@
 // A white ring is drawn over a 3D anchor (the Godot `Marker` nodes of the vehicle scene – the same tap targets the
 // Tesla app projects with VehicleManager.get_markers()). On hover the ring fills with a dot and a leader line (45°
 // diagonal, then horizontal) carries a label with the action for the current state; clicking performs the action.
+// On touch there is no hover, so the first tap only reveals the label (arming the hotspot) and a second tap on the same
+// hotspot within ARM_MS confirms and performs the action.
 // Anchors whose side of the car faces away from the camera are hidden (facing test on the marker's outward normal).
 import * as THREE from 'three';
 
@@ -30,7 +32,9 @@ const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
   const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v)); return e;
 };
 
-interface Entry { it: HotspotItem; g: SVGGElement; leader: SVGPolylineElement; label: SVGTextElement; hit: SVGCircleElement; hovered: boolean; visible: boolean; sx: number; sy: number; t?: any }
+interface Entry { it: HotspotItem; g: SVGGElement; leader: SVGPolylineElement; label: SVGTextElement; hit: SVGCircleElement; hovered: boolean; armed: boolean; visible: boolean; sx: number; sy: number; t?: any }
+
+const ARM_MS = 3000;
 
 export function createHotspots(o: HotspotOptions) {
   const ringRadius = o.ringRadius ?? 10, dotPadding = o.dotPadding ?? 3, hitRadius = o.hitRadius ?? 18, diagonal = o.diagonal ?? 34;
@@ -50,6 +54,8 @@ export function createHotspots(o: HotspotOptions) {
 
   const setHover = (e: Entry, on: boolean) => { if (e.hovered === on) return; e.hovered = on; e.g.classList.toggle('hs-hover', on); o.onHoverChange?.(); };
 
+  const disarm = (e: Entry) => { clearTimeout(e.t); e.armed = false; setHover(e, false); };
+
   const entries: Entry[] = o.items.map(it => {
     const g = el('g', { class: 'hs hs-hidden' });
     const leader = el('polyline', { class: 'hs-leader', fill: 'none', stroke: color, 'stroke-width': 1.5, 'stroke-linecap': 'round' });
@@ -59,13 +65,18 @@ export function createHotspots(o: HotspotOptions) {
     const hit = el('circle', { class: 'hs-hit', r: hitRadius });
     g.append(leader, ring, dot, label, hit);
     svg.appendChild(g);
-    const e: Entry = { it, g, leader, label, hit, hovered: false, visible: false, sx: 0, sy: 0 };
-    hit.addEventListener('pointerenter', () => setHover(e, true));
-    hit.addEventListener('pointerleave', () => setHover(e, false));
+    const e: Entry = { it, g, leader, label, hit, hovered: false, armed: false, visible: false, sx: 0, sy: 0 };
+    // touch hover is driven by the tap handler below, not by enter/leave (which fire around every tap)
+    hit.addEventListener('pointerenter', (ev: PointerEvent) => { if (ev.pointerType !== 'touch') setHover(e, true); });
+    hit.addEventListener('pointerleave', (ev: PointerEvent) => { if (ev.pointerType !== 'touch') setHover(e, false); });
     hit.addEventListener('pointerdown', ev => ev.stopPropagation());     // don't start an OrbitControls drag
     hit.addEventListener('click', (ev: PointerEvent) => {
-      ev.stopPropagation(); it.onToggle();
-      if (ev.pointerType === 'touch') { setHover(e, true); clearTimeout(e.t); e.t = setTimeout(() => setHover(e, false), 2000); }
+      ev.stopPropagation();
+      if (ev.pointerType !== 'touch') { it.onToggle(); return; }
+      if (e.armed) { disarm(e); it.onToggle(); return; }
+      for (const q of entries) if (q !== e && q.armed) disarm(q);
+      e.armed = true; setHover(e, true);
+      clearTimeout(e.t); e.t = setTimeout(() => disarm(e), ARM_MS);
     });
     return e;
   });
@@ -93,7 +104,7 @@ export function createHotspots(o: HotspotOptions) {
       e.it.object.getWorldPosition(world);
       ndc.copy(world).project(o.camera);
       const show = (e.it.enabled?.() ?? true) && ndc.z < 1 && Math.abs(ndc.x) < 1.2 && Math.abs(ndc.y) < 1.2 && facesCamera(e);
-      if (show !== e.visible) { e.visible = show; e.g.classList.toggle('hs-hidden', !show); if (!show) setHover(e, false); }
+      if (show !== e.visible) { e.visible = show; e.g.classList.toggle('hs-hidden', !show); if (!show) disarm(e); }
       if (!show) continue;
       const x = (ndc.x + 1) / 2 * w, y = (1 - ndc.y) / 2 * h;
       e.sx = x; e.sy = y;
