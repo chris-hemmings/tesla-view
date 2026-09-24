@@ -32,7 +32,7 @@ const el = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
   const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v)); return e;
 };
 
-interface Entry { it: HotspotItem; g: SVGGElement; leader: SVGPolylineElement; label: SVGTextElement; hit: SVGCircleElement; hovered: boolean; armed: boolean; visible: boolean; sx: number; sy: number; t?: any }
+interface Entry { it: HotspotItem; g: SVGGElement; leader: SVGPolylineElement; label: SVGTextElement; hint: SVGTextElement; hit: SVGCircleElement; hovered: boolean; armed: boolean; visible: boolean; sx: number; sy: number; t?: any }
 
 const ARM_MS = 3000;
 
@@ -48,13 +48,16 @@ export function createHotspots(o: HotspotOptions) {
     .hs-hover .hs-dot,.hs-hover .hs-leader,.hs-hover .hs-label{opacity:1}
     .hs-hidden{opacity:0;transition:opacity .12s ease}
     .hs-hidden .hs-hit{pointer-events:none}
+    .hs-hint{opacity:0;transition:opacity .12s ease;font:11px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:${color};fill-opacity:.75;paint-order:stroke;stroke:rgba(0,0,0,.35);stroke-width:3px}
+    .hs-armed .hs-hint{opacity:1}
     .hs-label{font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:${color};paint-order:stroke;stroke:rgba(0,0,0,.35);stroke-width:3px}
   `;
   o.container.appendChild(svg);
 
   const setHover = (e: Entry, on: boolean) => { if (e.hovered === on) return; e.hovered = on; e.g.classList.toggle('hs-hover', on); o.onHoverChange?.(); };
 
-  const disarm = (e: Entry) => { clearTimeout(e.t); e.armed = false; setHover(e, false); };
+  const setArmed = (e: Entry, on: boolean) => { e.armed = on; e.g.classList.toggle('hs-armed', on); };
+  const disarm = (e: Entry) => { clearTimeout(e.t); setArmed(e, false); setHover(e, false); };
 
   const entries: Entry[] = o.items.map(it => {
     const g = el('g', { class: 'hs hs-hidden' });
@@ -62,10 +65,12 @@ export function createHotspots(o: HotspotOptions) {
     const ring = el('circle', { class: 'hs-ring', r: ringRadius, fill: 'none', stroke: color, 'stroke-width': 1.5 });
     const dot = el('circle', { class: 'hs-dot', r: ringRadius - dotPadding, fill: color });
     const label = el('text', { class: 'hs-label', 'text-anchor': 'middle' });
+    const hint = el('text', { class: 'hs-hint', 'text-anchor': 'middle' });
+    hint.textContent = 'Tap again to confirm';
     const hit = el('circle', { class: 'hs-hit', r: hitRadius });
-    g.append(leader, ring, dot, label, hit);
+    g.append(leader, ring, dot, label, hint, hit);
     svg.appendChild(g);
-    const e: Entry = { it, g, leader, label, hit, hovered: false, armed: false, visible: false, sx: 0, sy: 0 };
+    const e: Entry = { it, g, leader, label, hint, hit, hovered: false, armed: false, visible: false, sx: 0, sy: 0 };
     // touch hover is driven by the tap handler below, not by enter/leave (which fire around every tap)
     hit.addEventListener('pointerenter', (ev: PointerEvent) => { if (ev.pointerType !== 'touch') setHover(e, true); });
     hit.addEventListener('pointerleave', (ev: PointerEvent) => { if (ev.pointerType !== 'touch') setHover(e, false); });
@@ -75,7 +80,7 @@ export function createHotspots(o: HotspotOptions) {
       if (ev.pointerType !== 'touch') { it.onToggle(); return; }
       if (e.armed) { disarm(e); it.onToggle(); return; }
       for (const q of entries) if (q !== e && q.armed) disarm(q);
-      e.armed = true; setHover(e, true);
+      setArmed(e, true); setHover(e, true);
       clearTimeout(e.t); e.t = setTimeout(() => disarm(e), ARM_MS);
     });
     return e;
@@ -113,7 +118,9 @@ export function createHotspots(o: HotspotOptions) {
       const text = e.it.label();
       if (e.label.textContent !== text) e.label.textContent = text;
       const half = ringRadius * Math.SQRT1_2;
-      const width = (e.label.getComputedTextLength?.() || text.length * 7) + labelPadding;
+      const textWidth = e.label.getComputedTextLength?.() || text.length * 7;
+      const hintWidth = e.armed ? (e.hint.getComputedTextLength?.() || 110) : 0;
+      const width = Math.max(textWidth, hintWidth) + labelPadding;
       const reach = half + diagonal + width + hitRadius, yTop = y - (half + diagonal);
       // leader direction: the side where the label does not run over another visible hotspot or leave the canvas; tie → away from the car
       const clashes = (d: number) => entries.filter(q => q !== e && q.visible && Math.abs(q.sy - yTop) < 40 && (q.sx - x) * d > 0 && Math.abs(q.sx - x) < reach).length
@@ -123,6 +130,7 @@ export function createHotspots(o: HotspotOptions) {
       const x1 = d * (half + diagonal), y1 = -(half + diagonal), x2 = x1 + d * width;
       e.leader.setAttribute('points', `${d * half},${-half} ${x1},${y1} ${x2},${y1}`);
       e.label.setAttribute('x', String((x1 + x2) / 2)); e.label.setAttribute('y', String(y1 - 6));
+      e.hint.setAttribute('x', String((x1 + x2) / 2)); e.hint.setAttribute('y', String(y1 + 15));
     }
   }
   const anyHovered = () => entries.some(e => e.hovered);
