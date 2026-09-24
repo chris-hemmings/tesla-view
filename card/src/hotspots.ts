@@ -50,13 +50,18 @@ export function createHotspots(o: HotspotOptions) {
     .hs-hidden .hs-hit{pointer-events:none}
     .hs-hint{opacity:0;transition:opacity .12s ease;font:11px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:${color};fill-opacity:.75;paint-order:stroke;stroke:rgba(0,0,0,.35);stroke-width:3px}
     .hs-armed .hs-hint{opacity:1}
+    .hs-focus .hs:not(.hs-armed){opacity:0;transition:opacity .12s ease}
+    .hs-focus .hs:not(.hs-armed) .hs-hit{pointer-events:none}
     .hs-label{font:13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:${color};paint-order:stroke;stroke:rgba(0,0,0,.35);stroke-width:3px}
   `;
   o.container.appendChild(svg);
 
   const setHover = (e: Entry, on: boolean) => { if (e.hovered === on) return; e.hovered = on; e.g.classList.toggle('hs-hover', on); o.onHoverChange?.(); };
 
-  const setArmed = (e: Entry, on: boolean) => { e.armed = on; e.g.classList.toggle('hs-armed', on); };
+  // while a touch hotspot is armed, the others are hidden so only the one awaiting confirmation is shown
+  const setArmed = (e: Entry, on: boolean) => {
+    e.armed = on; e.g.classList.toggle('hs-armed', on); svg.classList.toggle('hs-focus', entries.some(q => q.armed));
+  };
   const disarm = (e: Entry) => { clearTimeout(e.t); setArmed(e, false); setHover(e, false); };
 
   const entries: Entry[] = o.items.map(it => {
@@ -85,6 +90,9 @@ export function createHotspots(o: HotspotOptions) {
     });
     return e;
   });
+  // a tap anywhere else on the card cancels an armed hotspot
+  const cancelArmed = (ev: PointerEvent) => { if (!entries.some(e => e.hit === ev.target)) for (const e of entries) if (e.armed) disarm(e); };
+  o.container.addEventListener('pointerdown', cancelArmed, true);
 
   const world = new THREE.Vector3(), ndc = new THREE.Vector3(), camPos = new THREE.Vector3(), toCam = new THREE.Vector3();
   const center = new THREE.Vector3(), normal = new THREE.Vector3(), local = new THREE.Vector3(), rot = new THREE.Matrix3();
@@ -121,19 +129,26 @@ export function createHotspots(o: HotspotOptions) {
       const textWidth = e.label.getComputedTextLength?.() || text.length * 7;
       const hintWidth = e.armed ? (e.hint.getComputedTextLength?.() || 110) : 0;
       const width = Math.max(textWidth, hintWidth) + labelPadding;
-      const reach = half + diagonal + width + hitRadius, yTop = y - (half + diagonal);
+      const rise = half + diagonal, edge = 4;
+      // leader goes up unless the label would be cut off by the top of the canvas and there is room below
+      const v = y - rise - 22 < edge && y + rise + 36 <= h - edge ? 1 : -1;
+      const reach = rise + width + hitRadius, yTop = y + v * rise;
       // leader direction: the side where the label does not run over another visible hotspot or leave the canvas; tie → away from the car
+      const overflow = (d: number) => Math.max(0, -(x + d * reach), x + d * reach - w);
       const clashes = (d: number) => entries.filter(q => q !== e && q.visible && Math.abs(q.sy - yTop) < 40 && (q.sx - x) * d > 0 && Math.abs(q.sx - x) < reach).length
-        + ((x + d * reach < 0 || x + d * reach > w) ? 10 : 0);
+        + (overflow(d) > 0 ? 10 + overflow(d) / 10 : 0);
       const away = x < centerX ? -1 : 1;
       const d = clashes(away) <= clashes(-away) ? away : -away;
-      const x1 = d * (half + diagonal), y1 = -(half + diagonal), x2 = x1 + d * width;
-      e.leader.setAttribute('points', `${d * half},${-half} ${x1},${y1} ${x2},${y1}`);
-      e.label.setAttribute('x', String((x1 + x2) / 2)); e.label.setAttribute('y', String(y1 - 6));
-      e.hint.setAttribute('x', String((x1 + x2) / 2)); e.hint.setAttribute('y', String(y1 + 15));
+      const x1 = d * rise, y1 = v * rise, x2 = x1 + d * width;
+      e.leader.setAttribute('points', `${d * half},${v * half} ${x1},${y1} ${x2},${y1}`);
+      // keep the text inside the canvas even when neither side has room for the full leader
+      const halfText = Math.max(textWidth, hintWidth) / 2;
+      const tx = Math.min(Math.max((x1 + x2) / 2, edge + halfText - x), w - edge - halfText - x);
+      e.label.setAttribute('x', String(tx)); e.label.setAttribute('y', String(v < 0 ? y1 - 6 : y1 + 17));
+      e.hint.setAttribute('x', String(tx)); e.hint.setAttribute('y', String(v < 0 ? y1 + 15 : y1 + 32));
     }
   }
   const anyHovered = () => entries.some(e => e.hovered);
-  function dispose() { svg.remove(); }
+  function dispose() { o.container.removeEventListener('pointerdown', cancelArmed, true); svg.remove(); }
   return { update, dispose, entries, svg, anyHovered };
 }
