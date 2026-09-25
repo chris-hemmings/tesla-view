@@ -41,8 +41,8 @@ export interface CardConfig {
   cable?: string;                 // auto | CCS | EU | US …
   rhd?: boolean;
   theme?: 'auto' | 'dark' | 'light';
-  background_dark?: string;       // CSS colour behind the car in dark mode (default: the pack's)
-  background_light?: string;      // CSS colour behind the car in light mode (default: the pack's)
+  background_dark?: string;       // CSS colour or gradient behind the car in dark mode (default: the pack's)
+  background_light?: string;      // CSS colour or gradient behind the car in light mode (default: the pack's)
   camera?: string;                // preset name from the pack (parked, top_down, charging, …) or "free"
   aspect_ratio?: string;          // e.g. "16:9"
   height?: number;                // px, overrides aspect_ratio

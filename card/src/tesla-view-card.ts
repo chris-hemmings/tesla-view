@@ -109,7 +109,8 @@ export class TeslaViewCard extends LitElement {
   // ---------- lifecycle ----------
   protected firstUpdated() {
     const canvas = this.renderRoot.querySelector('canvas') as HTMLCanvasElement;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'low-power' });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true,   // alpha: CSS gradient backgrounds show through a cleared canvas
+      powerPreference: 'low-power' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;      // GLES2: framebuffer written as-is
@@ -161,10 +162,18 @@ export class TeslaViewCard extends LitElement {
     const t = this.config?.theme || 'auto';
     const dark = t === 'dark' ? true : t === 'light' ? false : (this._hass?.themes?.darkMode ?? true);
     const bg = this.manifest?.environment?.bg || { dark: '#161718', light: '#F7F7F7' };
-    const color = new THREE.Color(dark ? bg.dark : bg.light);
-    const custom = (dark ? this.config?.background_dark : this.config?.background_light)?.trim();
-    if (custom && CSS.supports('color', custom)) color.setStyle(custom);
-    this.scene.background = color; this.wake(50);
+    const custom = (dark ? this.config?.background_dark : this.config?.background_light)?.trim() || '';
+    // a plain colour is the scene's clear colour; anything else CSS can paint (gradients, images) goes behind a transparent canvas
+    const cssBackground = custom && !CSS.supports('color', custom) && CSS.supports('background', custom) ? custom : '';
+    const wrap = this.renderRoot?.querySelector<HTMLElement>('.wrap');
+    if (wrap && wrap.style.background !== cssBackground) wrap.style.background = cssBackground;
+    if (cssBackground) this.scene.background = null;
+    else {
+      const color = new THREE.Color(dark ? bg.dark : bg.light);
+      if (custom && CSS.supports('color', custom)) color.setStyle(custom);
+      this.scene.background = color;
+    }
+    this.wake(50);
   }
   private async setupEnvironment(env: PackEnvironment, base: string) {
     if (!this.renderer || !env.panorama || this.envBase === base) return;

@@ -43,8 +43,8 @@ const HELPERS: Record<string, string> = {
   flash_lights: 'button/script pressed by the lights hotspot',
   headlights: 'no Tesla Fleet equivalent – e.g. a BLE binary sensor',
   drl: 'no Tesla Fleet equivalent',
-  background_dark: 'Any CSS colour, e.g. #000000; empty = pack default',
-  background_light: 'Any CSS colour, e.g. #ffffff; empty = pack default',
+  background_dark: 'CSS colour or gradient, e.g. #000000 or linear-gradient(#1a2a3a, #000); empty = pack default',
+  background_light: 'CSS colour or gradient, e.g. #ffffff or radial-gradient(#fff, #ccc); empty = pack default',
 };
 
 /** Visual editor: device + look (from the asset pack) + one entity picker per channel. `states:` / `actions:` stay YAML. */
