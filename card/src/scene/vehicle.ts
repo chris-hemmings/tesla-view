@@ -154,6 +154,7 @@ export class Vehicle {
     v.buildMarkers();
     await Promise.all([v.loadWheels(opts.wheels), v.loadBrakes(!!opts.performance), v.loadAnimations()]);
     for (const group of Object.values(v.lights)) { group.on.forEach(n => v.setVisible([n], false)); (group.off || []).forEach(n => v.setVisible([n], true)); }
+    v.buildLightsAnchor();
     return v;
   }
 
@@ -173,12 +174,31 @@ export class Vehicle {
       }
       this.markers[m.name] = o;
     }
-    if (!this.markers.lights) {   // front light bar: derived from the body's bounding box (nose = −Z)
-      const box = new THREE.Box3().setFromObject(this.glbRoot);
-      const o = new THREE.Object3D(); o.name = 'LightsAnchor';
-      o.position.set(0, box.min.y + 0.45 * (box.max.y - box.min.y), box.min.z + 0.1);
-      this.glbRoot.add(o); this.nodes.LightsAnchor = o; this.markers.lights = o;
-    }
+  }
+
+  /** Front light bar anchor when the pack has no lights marker: derived from the body's bounding box (nose = −Z).
+   *  Measured in glbRoot's local space (the anchor's own space) over visible meshes only, after the light groups are
+   *  switched off – hidden variants, the long headlight beam meshes and the ground plane would otherwise push it ahead of the car. */
+  private buildLightsAnchor() {
+    if (this.markers.lights) return;
+    const box = new THREE.Box3(), part = new THREE.Box3(), toRoot = new THREE.Matrix4();
+    this.glbRoot.updateWorldMatrix(true, true);
+    const inv = this.glbRoot.matrixWorld.clone().invert();
+    const walk = (o: THREE.Object3D) => {
+      if (!o.visible) return;
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh && mesh.geometry) {
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        part.copy(mesh.geometry.boundingBox!).applyMatrix4(toRoot.multiplyMatrices(inv, mesh.matrixWorld));
+        if (part.max.y - part.min.y > 0.01) box.union(part);   // skip flat ground / shadow planes
+      }
+      o.children.forEach(walk);
+    };
+    walk(this.glbRoot);
+    if (box.isEmpty()) return;
+    const o = new THREE.Object3D(); o.name = 'LightsAnchor';
+    o.position.set(0, box.min.y + 0.45 * (box.max.y - box.min.y), box.min.z + 0.1);
+    this.glbRoot.add(o); this.nodes.LightsAnchor = o; this.markers.lights = o;
   }
 
   private async loadWheels(want?: string | null) {
