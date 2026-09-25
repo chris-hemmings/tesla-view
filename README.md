@@ -84,6 +84,8 @@ seats: 5               # 5 | 7 (when the model has a 7-seat variant)
 cable: auto            # auto | CCS | EU | US … (charge cable model)
 rhd: false             # right-hand drive interior
 theme: auto            # auto (follows HA dark mode) | dark | light
+background_dark: "#000000"   # optional: colour behind the car in dark mode (any CSS colour; default from the pack)
+background_light: "#ffffff"  # optional: same for light mode
 camera: parked         # parked | top_down | charging | drive | climate (presets from the pack) | free
 aspect_ratio: "16:9"   # or height: 360
 hotspots: true

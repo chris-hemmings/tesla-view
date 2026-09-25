@@ -23,7 +23,7 @@ const CHANNEL_DOMAINS: Record<ChannelId, string[]> = {
 
 const LABELS: Record<string, string> = {
   device_id: 'Tesla Fleet device', model: 'Model', trim: 'Trim', paint: 'Paint', wheels: 'Wheels', plate: 'Plate', seats: 'Seats', cable: 'Charge cable',
-  theme: 'Theme', camera: 'Camera', aspect_ratio: 'Aspect ratio', rhd: 'Right-hand drive', hotspots: 'Show hotspots',
+  theme: 'Theme', background_dark: 'Dark background', background_light: 'Light background', camera: 'Camera', aspect_ratio: 'Aspect ratio', rhd: 'Right-hand drive', hotspots: 'Show hotspots',
   frunk: 'Frunk', trunk: 'Trunk', charge_port: 'Charge port door', lock: 'Lock',
   door_fl: 'Front left door', door_fr: 'Front right door', door_rl: 'Rear left door', door_rr: 'Rear right door',
   window_fl: 'Front left window', window_fr: 'Front right window', window_rl: 'Rear left window', window_rr: 'Rear right window',
@@ -43,6 +43,8 @@ const HELPERS: Record<string, string> = {
   flash_lights: 'button/script pressed by the lights hotspot',
   headlights: 'no Tesla Fleet equivalent – e.g. a BLE binary sensor',
   drl: 'no Tesla Fleet equivalent',
+  background_dark: 'Any CSS colour, e.g. #000000; empty = pack default',
+  background_light: 'Any CSS colour, e.g. #ffffff; empty = pack default',
 };
 
 /** Visual editor: device + look (from the asset pack) + one entity picker per channel. `states:` / `actions:` stay YAML. */
@@ -87,6 +89,8 @@ export class TeslaViewCardEditor extends LitElement {
       if (entry.variants.includes('seats_7')) look.push({ name: 'seats', selector: sel([{ value: '5', label: '5' }, { value: '7', label: '7' }]) });
       if (m && Object.keys(m.cables || {}).length > 1) look.push({ name: 'cable', selector: plain(['auto', ...Object.keys(m.cables)]) });
       look.push({ name: 'theme', selector: plain(['auto', 'dark', 'light']) });
+      if (this.config.theme !== 'light') look.push({ name: 'background_dark', selector: { text: {} } });
+      if (this.config.theme !== 'dark') look.push({ name: 'background_light', selector: { text: {} } });
       look.push({ name: 'camera', selector: plain([...Object.keys(m?.environment?.presets || { parked: 1, top_down: 1 }), 'free']) });
       look.push({ name: 'aspect_ratio', selector: { text: {} } });
     }
@@ -119,6 +123,8 @@ export class TeslaViewCardEditor extends LitElement {
     if (Object.keys(entities).length) value.entities = entities; else delete value.entities;
     if (!value.device_id) delete value.device_id;
     if (!value.paint) delete value.paint;
+    if (!value.background_dark?.trim()) delete value.background_dark;
+    if (!value.background_light?.trim()) delete value.background_light;
     if ((value as any).seats !== undefined) (value as any).seats = Number((value as any).seats) === 7 ? 7 : 5;
     this.config = value;
     this.loadManifest();

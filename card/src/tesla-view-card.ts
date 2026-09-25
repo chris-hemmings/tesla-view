@@ -82,6 +82,7 @@ export class TeslaViewCard extends LitElement {
     if (!prev || LOAD_KEYS.some(k => (prev as any)[k] !== (this.config as any)[k])) this.loadVehicle();
     else if (prev.camera !== this.config.camera) { this.firstSync = true; this.applyPreset(); }
     if (this._hass) this.resolve();
+    this.applyTheme();
     this.requestUpdate();
   }
   set hass(hass: HomeAssistant) {
@@ -160,7 +161,10 @@ export class TeslaViewCard extends LitElement {
     const t = this.config?.theme || 'auto';
     const dark = t === 'dark' ? true : t === 'light' ? false : (this._hass?.themes?.darkMode ?? true);
     const bg = this.manifest?.environment?.bg || { dark: '#161718', light: '#F7F7F7' };
-    this.scene.background = new THREE.Color(dark ? bg.dark : bg.light); this.wake(50);
+    const color = new THREE.Color(dark ? bg.dark : bg.light);
+    const custom = (dark ? this.config?.background_dark : this.config?.background_light)?.trim();
+    if (custom && CSS.supports('color', custom)) color.setStyle(custom);
+    this.scene.background = color; this.wake(50);
   }
   private async setupEnvironment(env: PackEnvironment, base: string) {
     if (!this.renderer || !env.panorama || this.envBase === base) return;
